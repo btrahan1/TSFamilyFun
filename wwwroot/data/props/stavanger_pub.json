@@ -1,0 +1,235 @@
+{
+"Name": "StavangerPub",
+"Type": "Procedural",
+"Parts": [
+{
+"Id": "floor",
+"ParentId": null,
+"Shape": "Box",
+"Position": [0, -0.05, 0],
+"Rotation": [0, 0, 0],
+"Scale": [12, 0.1, 12],
+"ColorHex": "#2D1B10",
+"Material": "Leather",
+"Operation": "Union"
+},
+{
+"Id": "wall_back",
+"ParentId": null,
+"Shape": "Box",
+"Position": [0, 2, -5],
+"Rotation": [0, 0, 0],
+"Scale": [12, 4, 0.2],
+"ColorHex": "#4E342E",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "wall_left",
+"ParentId": null,
+"Shape": "Box",
+"Position": [6, 2, 0],
+"Rotation": [0, 90, 0],
+"Scale": [10, 4, 0.2],
+"ColorHex": "#4E342E",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "ceiling_beam_1",
+"ParentId": null,
+"Shape": "Box",
+"Position": [0, 3.8, -3],
+"Rotation": [0, 0, 0],
+"Scale": [12, 0.4, 0.4],
+"ColorHex": "#21150E",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "ceiling_beam_2",
+"ParentId": null,
+"Shape": "Box",
+"Position": [0, 3.8, 0],
+"Rotation": [0, 0, 0],
+"Scale": [12, 0.4, 0.4],
+"ColorHex": "#21150E",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "bar_counter_base",
+"ParentId": null,
+"Shape": "Box",
+"Position": [2, 0.5, -3],
+"Rotation": [0, 0, 0],
+"Scale": [6, 1, 0.8],
+"ColorHex": "#3E2723",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "bar_counter_top",
+"ParentId": null,
+"Shape": "Box",
+"Position": [2, 1.05, -3],
+"Rotation": [0, 0, 0],
+"Scale": [6.2, 0.1, 1],
+"ColorHex": "#1B110B",
+"Material": "Metal",
+"Operation": "Union"
+},
+{
+"Id": "stool_1_base",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [4, 0.35, -2],
+"Rotation": [0, 0, 0],
+"Scale": [0.3, 0.7, 0.3],
+"ColorHex": "#212121",
+"Material": "Metal",
+"Operation": "Union"
+},
+{
+"Id": "stool_1_seat",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [4, 0.75, -2],
+"Rotation": [0, 0, 0],
+"Scale": [0.4, 0.1, 0.4],
+"ColorHex": "#5D4037",
+"Material": "Leather",
+"Operation": "Union"
+},
+{
+"Id": "stool_2_base",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [2, 0.35, -2],
+"Rotation": [0, 0, 0],
+"Scale": [0.3, 0.7, 0.3],
+"ColorHex": "#212121",
+"Material": "Metal",
+"Operation": "Union"
+},
+{
+"Id": "stool_2_seat",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [2, 0.75, -2],
+"Rotation": [0, 0, 0],
+"Scale": [0.4, 0.1, 0.4],
+"ColorHex": "#5D4037",
+"Material": "Leather",
+"Operation": "Union"
+},
+{
+"Id": "table_heavy_top",
+"ParentId": null,
+"Shape": "Box",
+"Position": [-3, 0.7, 1],
+"Rotation": [0, 0, 0],
+"Scale": [2, 0.15, 2],
+"ColorHex": "#3E2723",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "table_heavy_leg",
+"ParentId": null,
+"Shape": "Box",
+"Position": [-3, 0.35, 1],
+"Rotation": [0, 0, 0],
+"Scale": [0.4, 0.7, 0.4],
+"ColorHex": "#21150E",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "bench_1",
+"ParentId": null,
+"Shape": "Box",
+"Position": [-3, 0.25, 2.5],
+"Rotation": [0, 0, 0],
+"Scale": [2, 0.5, 0.6],
+"ColorHex": "#3E2723",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "pendant_light_cord",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [2, 2.5, -3],
+"Rotation": [0, 0, 0],
+"Scale": [0.02, 2.5, 0.02],
+"ColorHex": "#111111",
+"Material": "Metal",
+"Operation": "Union"
+},
+{
+"Id": "pendant_bulb",
+"ParentId": null,
+"Shape": "Sphere",
+"Position": [2, 1.5, -3],
+"Rotation": [0, 0, 0],
+"Scale": [0.2, 0.2, 0.2],
+"ColorHex": "#FFD54F",
+"Material": "Glow",
+"Operation": "Union"
+},
+{
+"Id": "beer_mug",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [1.5, 1.2, -2.8],
+"Rotation": [0, 0, 0],
+"Scale": [0.15, 0.25, 0.15],
+"ColorHex": "#FFB300",
+"Material": "Glass",
+"Operation": "Union"
+},
+{
+"Id": "backbar_shelf",
+"ParentId": null,
+"Shape": "Box",
+"Position": [2, 1.8, -4.8],
+"Rotation": [0, 0, 0],
+"Scale": [5, 0.1, 0.4],
+"ColorHex": "#21150E",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "bottle_1",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [0.5, 2.05, -4.8],
+"Rotation": [0, 0, 0],
+"Scale": [0.1, 0.4, 0.1],
+"ColorHex": "#2E7D32",
+"Material": "Glass",
+"Operation": "Union"
+},
+{
+"Id": "bottle_2",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [1.0, 2.05, -4.8],
+"Rotation": [0, 0, 0],
+"Scale": [0.1, 0.4, 0.1],
+"ColorHex": "#BF360C",
+"Material": "Glass",
+"Operation": "Union"
+}
+],
+"Timeline": [
+{
+"Time": 0.0,
+"Action": "Color",
+"TargetId": "pendant_bulb",
+"Value": [1, 0.8, 0.4],
+"Duration": 1.0
+}
+]
+}

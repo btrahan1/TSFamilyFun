@@ -114,6 +114,8 @@ window.tsFamilyEngine = {
             this.createVoxelBench(container, bp);
         } else if (obj.type === "red_house") {
             this.createVoxelHouse(container, bp);
+        } else if (bp.recipe) {
+            this.createVoxelRecipe(container, bp);
         } else {
             // Default placeholder
             const box = BABYLON.MeshBuilder.CreateBox("box_" + obj.id, { size: 1 }, this.scene);
@@ -231,6 +233,102 @@ window.tsFamilyEngine = {
         windowFrame.parent = parent;
         windowFrame.position = new BABYLON.Vector3(0.8, 1.8, -2.01);
         windowFrame.material = trimMat;
+    },
+
+    createVoxelRecipe: async function (parent, bp) {
+        try {
+            const response = await fetch(bp.recipe);
+            const data = await response.json();
+            const parts = data.Parts || data.parts;
+            if (!parts) return;
+
+            const registry = new Map();
+
+            parts.forEach(p => {
+                this.createProp(p, parent, registry);
+            });
+        } catch (e) {
+            console.error("Error rendering recipe:", e);
+        }
+    },
+
+    createProp: function (config, root, registry) {
+        const getVal = (obj, prop) => {
+            if (!obj) return null;
+            if (obj[prop] !== undefined) return obj[prop];
+            const lower = prop.toLowerCase();
+            for (let k in obj) { if (k.toLowerCase() === lower) return obj[k]; }
+            return null;
+        };
+
+        const parseVec3 = (data, defaultVal = { x: 0, y: 0, z: 0 }) => {
+            if (!data) return new BABYLON.Vector3(defaultVal.x, defaultVal.y, defaultVal.z);
+            if (Array.isArray(data)) return new BABYLON.Vector3(data[0] ?? defaultVal.x, data[1] ?? defaultVal.y, data[2] ?? defaultVal.z);
+            return new BABYLON.Vector3(
+                getVal(data, "x") ?? defaultVal.x,
+                getVal(data, "y") ?? defaultVal.y,
+                getVal(data, "z") ?? defaultVal.z
+            );
+        };
+
+        const id = getVal(config, "Id") || "p_" + Math.random().toString(36).substr(2, 5);
+        const shape = (getVal(config, "Shape") || "Box").toLowerCase();
+        const scale = parseVec3(getVal(config, "Scale"), { x: 1, y: 1, z: 1 });
+        const pos = parseVec3(getVal(config, "Position"));
+        const rot = parseVec3(getVal(config, "Rotation"));
+
+        let mesh;
+        if (shape === "sphere") mesh = BABYLON.MeshBuilder.CreateSphere(id, { diameter: 1 }, this.scene);
+        else if (shape === "cylinder") mesh = BABYLON.MeshBuilder.CreateCylinder(id, { diameter: 1, height: 1 }, this.scene);
+        else mesh = BABYLON.MeshBuilder.CreateBox(id, { size: 1 }, this.scene);
+
+        mesh.scaling = scale;
+        mesh.position = pos;
+        mesh.rotation = new BABYLON.Vector3(
+            BABYLON.Tools.ToRadians(rot.x),
+            BABYLON.Tools.ToRadians(rot.y),
+            BABYLON.Tools.ToRadians(rot.z)
+        );
+
+        const parentId = getVal(config, "ParentId");
+        if (parentId && registry.has(parentId)) {
+            mesh.parent = registry.get(parentId);
+        } else {
+            mesh.parent = root;
+        }
+
+        mesh.material = this.createPBR(id, config);
+        registry.set(id, mesh);
+    },
+
+    createPBR: function (id, config) {
+        const getVal = (obj, prop) => {
+            if (!obj) return null;
+            if (obj[prop] !== undefined) return obj[prop];
+            const lower = prop.toLowerCase();
+            for (let k in obj) { if (k.toLowerCase() === lower) return obj[k]; }
+            return null;
+        };
+
+        const mat = new BABYLON.PBRMaterial("pbr_" + id, this.scene);
+        const colHex = getVal(config, "ColorHex");
+        mat.albedoColor = colHex ? BABYLON.Color3.FromHexString(colHex) : new BABYLON.Color3(0.5, 0.5, 0.5);
+        mat.metallic = 0;
+        mat.roughness = 0.5;
+
+        const matType = (getVal(config, "Material") || "Plastic").toLowerCase();
+        if (matType.includes("metal")) {
+            mat.metallic = 1.0;
+            mat.roughness = 0.1;
+        } else if (matType.includes("glass")) {
+            mat.alpha = 0.4;
+            mat.transparencyMode = BABYLON.PBRMaterial.PBR_ALPHABLEND;
+        } else if (matType.includes("glow")) {
+            mat.emissiveColor = mat.albedoColor;
+            mat.emissiveIntensity = 2.0;
+        }
+
+        return mat;
     },
 
     createScene: function () {

@@ -27,6 +27,12 @@
             "wallColor": "#C62828",
             "trimColor": "#FFFFFF",
             "roofColor": "#37474F"
+        },
+        {
+            "id": "stavanger_pub",
+            "name": "Stavanger Pub",
+            "category": "building",
+            "recipe": "data/props/stavanger_pub.json"
         }
     ]
 }
