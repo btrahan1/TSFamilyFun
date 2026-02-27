@@ -86,11 +86,19 @@ window.firebaseManager = {
     listenForWorldObjects: function (callback) {
         const q = query(collection(this.db, "world_objects"));
         return onSnapshot(q, (snapshot) => {
-            const objects = [];
-            snapshot.forEach((doc) => {
-                objects.push(doc.data());
+            snapshot.docChanges().forEach((change) => {
+                callback(change.type, change.doc.data());
             });
-            callback(objects);
         });
+    },
+
+    deleteWorldObject: async function (id) {
+        try {
+            const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
+            await deleteDoc(doc(this.db, "world_objects", id));
+            console.log("Object deleted:", id);
+        } catch (e) {
+            console.error("Error deleting object: ", e);
+        }
     }
 };

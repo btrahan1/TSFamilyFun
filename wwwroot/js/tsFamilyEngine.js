@@ -26,6 +26,7 @@ window.tsFamilyEngine = {
     targetDestination: null,
     moveMarker: null,
     lastTapTime: 0,
+    isBulldozing: false,
 
     init: async function (canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -43,6 +44,10 @@ window.tsFamilyEngine = {
                     break;
                 case BABYLON.KeyboardEventTypes.KEYUP:
                     this.inputMap[kbInfo.event.key.toLowerCase()] = false;
+                    if (kbInfo.event.key === "Escape") {
+                        if (this.isBuilding) this.toggleBuildMode(false);
+                        if (this.isBulldozing) this.toggleBulldozer(false);
+                    }
                     break;
             }
         });
@@ -64,10 +69,23 @@ window.tsFamilyEngine = {
                 const now = Date.now();
                 const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => mesh.name === "ground");
 
-                if (pickInfo.hit) {
-                    if (this.isBuilding) {
+                if (this.isBuilding) {
+                    const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => mesh.name === "ground");
+                    if (pickInfo.hit) {
                         this.placeObject(pickInfo.pickedPoint);
-                    } else {
+                    }
+                } else if (this.isBulldozing) {
+                    // Pick for any mesh that belongs to an object
+                    const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => mesh.name && mesh.name.startsWith("object_"));
+                    if (pickInfo.hit) {
+                        const objectId = pickInfo.pickedMesh.name.split('_')[1];
+                        if (confirm(`Are you sure you want to remove this object?`)) {
+                            window.firebaseManager.deleteWorldObject(objectId);
+                        }
+                    }
+                } else {
+                    const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => mesh.name === "ground");
+                    if (pickInfo.hit) {
                         // Double Tap Detection (Mobile Movement)
                         if (now - this.lastTapTime < 300) {
                             this.setTargetDestination(pickInfo.pickedPoint);
@@ -104,12 +122,18 @@ window.tsFamilyEngine = {
             return;
         }
 
-        window.firebaseManager.listenForWorldObjects((objects) => {
-            objects.forEach(obj => {
-                if (!this.worldObjects[obj.id]) {
-                    this.renderWorldObject(obj);
+        window.firebaseManager.listenForWorldObjects((type, obj) => {
+            if (type === "added" || type === "modified") {
+                if (this.worldObjects[obj.id]) {
+                    this.worldObjects[obj.id].dispose();
                 }
-            });
+                this.renderWorldObject(obj);
+            } else if (type === "removed") {
+                if (this.worldObjects[obj.id]) {
+                    this.worldObjects[obj.id].dispose();
+                    delete this.worldObjects[obj.id];
+                }
+            }
         });
     },
 
@@ -137,6 +161,13 @@ window.tsFamilyEngine = {
         }
 
         this.worldObjects[obj.id] = container;
+        container.blueprintId = obj.type; // For identification
+
+        // Ensure all child meshes are pickable for bulldozer if we want to click any part of it
+        container.getChildMeshes().forEach(m => {
+            m.name = "object_" + obj.id; // Force name for picking
+            m.isPickable = true;
+        });
     },
 
     createVoxelTree: function (parent, bp, seed) {
@@ -430,6 +461,7 @@ window.tsFamilyEngine = {
 
     toggleBuildMode: function (enabled, blueprintId = "apple_tree") {
         this.isBuilding = enabled;
+        if (enabled) this.isBulldozing = false; // Mutually exclusive
         this.selectedBlueprintId = blueprintId;
 
         if (this.previewNode) {
@@ -454,6 +486,17 @@ window.tsFamilyEngine = {
         const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => mesh.name === "ground");
         if (pickInfo.hit && this.previewNode) {
             this.previewNode.position = pickInfo.pickedPoint;
+        }
+    },
+
+    toggleBulldozer: function (enabled) {
+        this.isBulldozing = enabled;
+        if (enabled) {
+            this.isBuilding = false;
+            if (this.previewNode) {
+                this.previewNode.dispose();
+                this.previewNode = null;
+            }
         }
     },
 

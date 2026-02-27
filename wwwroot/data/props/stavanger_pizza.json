@@ -1,0 +1,198 @@
+{
+"Name": "StavangerPizza",
+"Type": "Procedural",
+"Parts": [
+{
+"Id": "floor",
+"ParentId": null,
+"Shape": "Box",
+"Position": [0, -0.05, 0],
+"Rotation": [0, 0, 0],
+"Scale": [12, 0.1, 12],
+"ColorHex": "#263238",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "wall_back",
+"ParentId": null,
+"Shape": "Box",
+"Position": [0, 2, -5],
+"Rotation": [0, 0, 0],
+"Scale": [12, 4, 0.3],
+"ColorHex": "#BCAAA4",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "oven_base",
+"ParentId": null,
+"Shape": "Box",
+"Position": [-3.5, 0.5, -4],
+"Rotation": [0, 0, 0],
+"Scale": [2.5, 1, 2],
+"ColorHex": "#455A64",
+"Material": "Metal",
+"Operation": "Union"
+},
+{
+"Id": "oven_dome",
+"ParentId": null,
+"Shape": "Sphere",
+"Position": [-3.5, 1, -4],
+"Rotation": [0, 0, 0],
+"Scale": [2.2, 1.5, 1.8],
+"ColorHex": "#546E7A",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "oven_mouth",
+"ParentId": null,
+"Shape": "Box",
+"Position": [-3.5, 1.1, -3.1],
+"Rotation": [0, 0, 0],
+"Scale": [1.2, 0.6, 0.2],
+"ColorHex": "#121212",
+"Material": "Plastic",
+"Operation": "Subtract"
+},
+{
+"Id": "oven_glow",
+"ParentId": null,
+"Shape": "Sphere",
+"Position": [-3.5, 1.0, -3.3],
+"Rotation": [0, 0, 0],
+"Scale": [0.8, 0.4, 0.4],
+"ColorHex": "#FF5722",
+"Material": "Glow",
+"Operation": "Union"
+},
+{
+"Id": "counter_front",
+"ParentId": null,
+"Shape": "Box",
+"Position": [2.5, 0.5, -2],
+"Rotation": [0, 0, 0],
+"Scale": [5, 1, 1.2],
+"ColorHex": "#FFFFFF",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "counter_marble",
+"ParentId": null,
+"Shape": "Box",
+"Position": [2.5, 1.05, -2],
+"Rotation": [0, 0, 0],
+"Scale": [5.2, 0.1, 1.4],
+"ColorHex": "#ECEFF1",
+"Material": "Glass",
+"Operation": "Union"
+},
+{
+"Id": "pizza_peel_handle",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [-1.5, 1.1, -2.5],
+"Rotation": [90, 20, 0],
+"Scale": [0.04, 2.0, 0.04],
+"ColorHex": "#795548",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "pizza_peel_blade",
+"ParentId": null,
+"Shape": "Box",
+"Position": [-1.8, 1.1, -1.5],
+"Rotation": [0, 20, 0],
+"Scale": [0.5, 0.02, 0.6],
+"ColorHex": "#CFD8DC",
+"Material": "Metal",
+"Operation": "Union"
+},
+{
+"Id": "dining_table",
+"ParentId": null,
+"Shape": "Box",
+"Position": [3, 0.7, 3],
+"Rotation": [0, 0, 0],
+"Scale": [1.8, 0.08, 1.8],
+"ColorHex": "#3E2723",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "table_leg",
+"ParentId": null,
+"Shape": "Cylinder",
+"Position": [3, 0.35, 3],
+"Rotation": [0, 0, 0],
+"Scale": [0.1, 0.7, 0.1],
+"ColorHex": "#212121",
+"Material": "Metal",
+"Operation": "Union"
+},
+{
+"Id": "pizza_box",
+"ParentId": null,
+"Shape": "Box",
+"Position": [3.2, 0.8, 3.1],
+"Rotation": [0, 15, 0],
+"Scale": [0.8, 0.1, 0.8],
+"ColorHex": "#F5F5F5",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "pizza_box_logo",
+"ParentId": null,
+"Shape": "Sphere",
+"Position": [3.2, 0.86, 3.1],
+"Rotation": [0, 0, 0],
+"Scale": [0.2, 0.01, 0.2],
+"ColorHex": "#D32F2F",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "chair_1",
+"ParentId": null,
+"Shape": "Box",
+"Position": [1.5, 0.4, 3],
+"Rotation": [0, 0, 0],
+"Scale": [0.6, 0.8, 0.6],
+"ColorHex": "#212121",
+"Material": "Plastic",
+"Operation": "Union"
+},
+{
+"Id": "hanging_menu",
+"ParentId": null,
+"Shape": "Box",
+"Position": [2.5, 3, -1.9],
+"Rotation": [0, 0, 0],
+"Scale": [2.5, 1.5, 0.05],
+"ColorHex": "#212121",
+"Material": "Plastic",
+"Operation": "Union"
+}
+],
+"Timeline": [
+{
+"Time": 0.0,
+"Action": "Color",
+"TargetId": "oven_glow",
+"Value": [1, 0.3, 0],
+"Duration": 1.0
+},
+{
+"Time": 1.0,
+"Action": "Scale",
+"TargetId": "oven_glow",
+"Value": [0.85, 0.45, 0.45],
+"Duration": 0.5
+}
+]
+}

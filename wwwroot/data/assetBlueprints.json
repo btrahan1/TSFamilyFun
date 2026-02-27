@@ -33,6 +33,18 @@
             "name": "Stavanger Pub",
             "category": "building",
             "recipe": "data/props/stavanger_pub.json"
+        },
+        {
+            "id": "stavanger_burger",
+            "name": "Stavanger Burger",
+            "category": "building",
+            "recipe": "data/props/stavanger_burger.json"
+        },
+        {
+            "id": "stavanger_pizza",
+            "name": "Stavanger Pizza",
+            "category": "building",
+            "recipe": "data/props/stavanger_pizza.json"
         }
     ]
 }
