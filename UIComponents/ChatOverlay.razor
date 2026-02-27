@@ -1,0 +1,97 @@
+@using TSFamilyFun.Models
+
+<div class="chat-container glass-panel">
+    <div class="chat-history">
+        @foreach (var msg in Messages)
+        {
+            <div class="chat-entry">
+                <span class="chat-user">@msg.User:</span>
+                <span class="chat-text">@msg.Message</span>
+            </div>
+        }
+    </div>
+    <div class="chat-input-area">
+        <input type="text" @bind="CurrentMessage" @bind:event="oninput" @onkeyup="HandleKeyUp" placeholder="Press Enter to chat..." class="chat-input" />
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<ChatMessage> Messages { get; set; } = new();
+    [Parameter] public EventCallback<string> OnSendMessage { get; set; }
+    
+    private string CurrentMessage { get; set; } = "";
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(CurrentMessage))
+        {
+            await OnSendMessage.InvokeAsync(CurrentMessage);
+            CurrentMessage = "";
+        }
+    }
+}
+
+<style>
+    .chat-container {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        width: 350px;
+        height: 250px;
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        gap: 10px;
+        pointer-events: auto;
+    }
+
+    .chat-history {
+        flex: 1;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding-right: 5px;
+    }
+
+    .chat-history::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .chat-history::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 2px;
+    }
+
+    .chat-entry {
+        font-size: 0.9rem;
+        line-height: 1.2;
+        color: var(--white);
+        word-break: break-word;
+    }
+
+    .chat-user {
+        font-weight: 700;
+        color: var(--accent-yellow);
+        margin-right: 5px;
+    }
+
+    .chat-input-area {
+        height: 40px;
+    }
+
+    .chat-input {
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        padding: 0 10px;
+        color: var(--white);
+        outline: none;
+    }
+
+    .chat-input:focus {
+        border-color: var(--accent-yellow);
+    }
+</style>

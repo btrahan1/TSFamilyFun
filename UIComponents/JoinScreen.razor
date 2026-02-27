@@ -1,0 +1,105 @@
+@using Microsoft.AspNetCore.Components.Forms
+
+<div class="join-screen-overlay @(IsVisible ? "" : "hidden")">
+    <div class="glass-panel join-card">
+        <h2 class="stavanger-header">Velkommen til Stavanger</h2>
+        <p class="stavanger-subtext">Enter your name to join the gathering place.</p>
+        
+        <input type="text" @bind="UserName" placeholder="Your Name..." class="stavanger-input" @onkeyup="HandleKeyUp" />
+        
+        <button class="stavanger-button" @onclick="() => OnJoin.InvokeAsync(UserName)">
+            Join Plaza
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; } = true;
+    [Parameter] public EventCallback<string> OnJoin { get; set; }
+    
+    private string UserName { get; set; } = "";
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(UserName))
+        {
+            await OnJoin.InvokeAsync(UserName);
+        }
+    }
+}
+
+<style>
+    .join-screen-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        transition: opacity 0.5s ease-in-out;
+    }
+
+    .join-screen-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .join-card {
+        width: 400px;
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        text-align: center;
+    }
+
+    .stavanger-header {
+        color: var(--white);
+        font-weight: 800;
+        font-size: 1.8rem;
+    }
+
+    .stavanger-subtext {
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 0.9rem;
+    }
+
+    .stavanger-input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 8px;
+        padding: 1rem;
+        color: var(--white);
+        font-size: 1.1rem;
+        outline: none;
+        transition: border-color 0.3s;
+    }
+
+    .stavanger-input:focus {
+        border-color: var(--accent-yellow);
+    }
+
+    .stavanger-button {
+        background: var(--accent-red);
+        color: var(--white);
+        border: none;
+        border-radius: 8px;
+        padding: 1rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: transform 0.2s, background 0.2s;
+    }
+
+    .stavanger-button:hover {
+        background: #b51c1c;
+        transform: scale(1.02);
+    }
+
+    .stavanger-button:active {
+        transform: scale(0.98);
+    }
+</style>

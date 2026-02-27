@@ -1,0 +1,85 @@
+﻿@page "/"
+@inject IJSRuntime JSRuntime
+@using TSFamilyFun.UIComponents
+@using TSFamilyFun.Models
+
+<PageTitle>TSFamilyFun - Stavanger Plaza</PageTitle>
+
+<div class="app-viewport">
+    <canvas id="renderCanvas"></canvas>
+    
+    <div class="ui-layer">
+        @if (!string.IsNullOrEmpty(CurrentUserName))
+        {
+            <div class="top-hud glass-panel">
+                <span class="hud-name">@CurrentUserName</span>
+                <span class="hud-status">Online</span>
+            </div>
+
+            <ChatOverlay Messages="ChatMessages" OnSendMessage="SendMessage" />
+        }
+    </div>
+
+    <JoinScreen IsVisible="@(!HasJoined)" OnJoin="HandleJoin" />
+</div>
+
+@code {
+    private bool HasJoined = false;
+    private string CurrentUserName = "";
+    private List<ChatMessage> ChatMessages = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("tsFamilyEngine.init", "renderCanvas");
+        }
+    }
+
+    private async Task HandleJoin(string name)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            CurrentUserName = name;
+            HasJoined = true;
+            await JSRuntime.InvokeVoidAsync("tsFamilyEngine.spawnUser", name);
+            
+            // Mock welcome message
+            ChatMessages.Add(new ChatMessage { User = "System", Message = $"Welcome to Stavanger, {name}!" });
+        }
+    }
+
+    private void SendMessage(string message)
+    {
+        ChatMessages.Add(new ChatMessage { 
+            User = CurrentUserName, 
+            Message = message 
+        });
+        
+        // In a real app, we'd send this to SignalR here
+    }
+}
+
+<style>
+    .top-hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        padding: 0.5rem 1.5rem;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        color: var(--white);
+    }
+
+    .hud-name {
+        font-weight: 700;
+    }
+
+    .hud-status {
+        font-size: 0.8rem;
+        color: #4caf50;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+</style>
