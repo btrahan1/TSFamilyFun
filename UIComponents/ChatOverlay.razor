@@ -1,7 +1,8 @@
 @using TSFamilyFun.Models
+@inject IJSRuntime JSRuntime
 
 <div class="chat-container glass-panel">
-    <div class="chat-history">
+    <div class="chat-history" @ref="chatHistory">
         @foreach (var msg in Messages)
         {
             <div class="chat-entry">
@@ -21,6 +22,17 @@
     [Parameter] public EventCallback<string> OnSendMessage { get; set; }
     
     private string CurrentMessage { get; set; } = "";
+    private ElementReference chatHistory;
+    private int messageCount = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Messages.Count != messageCount)
+        {
+            messageCount = Messages.Count;
+            await JSRuntime.InvokeVoidAsync("tsFamilyEngine.scrollToBottom", chatHistory);
+        }
+    }
 
     private async Task SendMessage()
     {

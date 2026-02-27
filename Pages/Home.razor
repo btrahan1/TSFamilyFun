@@ -14,6 +14,9 @@
             <div class="top-hud glass-panel">
                 <span class="hud-name">@CurrentUserName</span>
                 <span class="hud-status">Online</span>
+                <button class="build-toggle @(IsRecreationMode ? "recreation-active" : "")" @onclick="ToggleRecreationMode">
+                    @(IsRecreationMode ? "🛹 Exit Recreation" : "🛹 Recreation")
+                </button>
                 <button class="build-toggle @(IsBuildMode ? "active" : "")" @onclick="ToggleBuildMode">
                     @(IsBuildMode ? "🔨 Exit Build" : "🔨 Build")
                 </button>
@@ -36,6 +39,17 @@
                     </div>
                 </div>
             }
+            
+            @if (IsRecreationMode)
+            {
+                <div class="build-menu glass-panel">
+                    <span class="menu-title">Recreation</span>
+                    <div class="asset-list">
+                        <div class="asset-item @(TransportMode == "walk" ? "selected" : "")" @onclick="@(() => SetTransport("walk"))">🚶 Walking</div>
+                        <div class="asset-item @(TransportMode == "skate" ? "selected" : "")" @onclick="@(() => SetTransport("skate"))">🛹 Skateboard</div>
+                    </div>
+                </div>
+            }
 
             <ChatOverlay Messages="ChatMessages" OnSendMessage="SendMessage" />
         }
@@ -49,6 +63,8 @@
     private string CurrentUserName = "";
     private List<ChatMessage> ChatMessages = new();
     private bool IsBuildMode = false;
+    private bool IsRecreationMode = false;
+    private string TransportMode = "walk";
     private bool IsBulldozerMode = false;
     private string SelectedAsset = "apple_tree";
     private DotNetObjectReference<Home>? objRef;
@@ -90,7 +106,25 @@
     private async Task ToggleBuildMode()
     {
         IsBuildMode = !IsBuildMode;
+        if (IsBuildMode) IsRecreationMode = false;
         await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", IsBuildMode, SelectedAsset);
+        if (IsBuildMode) await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBulldozer", false);
+    }
+
+    private async Task ToggleRecreationMode()
+    {
+        IsRecreationMode = !IsRecreationMode;
+        if (IsRecreationMode) 
+        {
+            IsBuildMode = false;
+            await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", false);
+        }
+    }
+
+    private async Task SetTransport(string mode)
+    {
+        TransportMode = mode;
+        await JSRuntime.InvokeVoidAsync("tsFamilyEngine.setTransportMode", mode);
     }
 
     private async Task SelectAsset(string assetId)
@@ -157,6 +191,11 @@
     .build-toggle.active {
         background: #f44336;
         border-color: #f44336;
+    }
+
+    .build-toggle.recreation-active {
+        background: #2196f3;
+        border-color: #2196f3;
     }
 
     .build-menu {

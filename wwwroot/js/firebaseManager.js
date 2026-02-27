@@ -20,7 +20,7 @@ window.firebaseManager = {
     playersRef: collection(db, "players"),
 
     // Update local player position
-    updatePlayerPosition: async function (userId, name, position, rotation) {
+    updatePlayerPosition: async function (userId, name, position, rotation, transportMode = "walk") {
         const playerDoc = doc(this.playersRef, userId);
         await setDoc(playerDoc, {
             name: name,
@@ -28,6 +28,7 @@ window.firebaseManager = {
             y: position.y,
             z: position.z,
             ry: rotation.y,
+            transportMode: transportMode,
             lastSeen: serverTimestamp()
         }, { merge: true });
     },

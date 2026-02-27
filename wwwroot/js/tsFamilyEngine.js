@@ -27,6 +27,7 @@ window.tsFamilyEngine = {
     moveMarker: null,
     lastTapTime: 0,
     isBulldozing: false,
+    transportMode: "walk", // walk, skate
 
     init: async function (canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -549,7 +550,8 @@ window.tsFamilyEngine = {
 
     hasJoined: false,
     handleMovement: function () {
-        const speed = 0.15;
+        const isSkating = this.transportMode === "skate";
+        const speed = isSkating ? 0.25 : 0.15;
         const rotateSpeed = 0.04;
         let isMoving = false;
 
@@ -605,16 +607,28 @@ window.tsFamilyEngine = {
 
         // Animate Limbs
         if (isMoving) {
-            this.walkTimer += 0.125;
+            this.walkTimer += isSkating ? 0.08 : 0.125;
             const swing = Math.sin(this.walkTimer) * 0.25;
 
-            // Legs move in opposition
-            this.player.limbs.leftLeg.rotation.x = swing;
-            this.player.limbs.rightLeg.rotation.x = -swing;
-
-            // Arms move in opposition to legs
-            this.player.limbs.leftArm.rotation.x = -swing;
-            this.player.limbs.rightArm.rotation.x = swing;
+            if (isSkating) {
+                // Skateboard Animation (Pushing)
+                // Left leg stays on board, slightly bent
+                this.player.limbs.leftLeg.rotation.x = 0.2;
+                // Right leg pushes
+                this.player.limbs.rightLeg.rotation.x = -swing * 2;
+                // Arms for balance
+                this.player.limbs.leftArm.rotation.x = -0.4;
+                this.player.limbs.rightArm.rotation.x = 0.4;
+                // Slight torso lean
+                this.player.limbs.torso.rotation.x = 0.15;
+            } else {
+                // Walking Animation
+                this.player.limbs.leftLeg.rotation.x = swing;
+                this.player.limbs.rightLeg.rotation.x = -swing;
+                this.player.limbs.leftArm.rotation.x = -swing;
+                this.player.limbs.rightArm.rotation.x = swing;
+                this.player.limbs.torso.rotation.x = 0;
+            }
 
             // Slight body bob
             this.player.limbs.torso.position.y = 1.2 + Math.abs(swing) * 0.05;
@@ -625,6 +639,7 @@ window.tsFamilyEngine = {
             this.player.limbs.rightLeg.rotation.x *= (1 - lerpSpeed);
             this.player.limbs.leftArm.rotation.x *= (1 - lerpSpeed);
             this.player.limbs.rightArm.rotation.x *= (1 - lerpSpeed);
+            this.player.limbs.torso.rotation.x *= (1 - lerpSpeed);
             this.player.limbs.torso.position.y = 1.2;
             this.walkTimer = 0;
         }
@@ -732,6 +747,9 @@ window.tsFamilyEngine = {
         rightLeg.position.y = -0.4;
         rightLeg.material = pantsMat;
 
+        // Skateboard (hidden by default)
+        this.createSkateboard();
+
         // Name tag
         const dynamicTexture = new BABYLON.DynamicTexture("nameTag", { width: 512, height: 256 }, this.scene);
         dynamicTexture.hasAlpha = true;
@@ -777,6 +795,7 @@ window.tsFamilyEngine = {
                 const ghost = this.ghostPlayers[p.id];
                 ghost.targetPosition = new BABYLON.Vector3(p.x, p.y, p.z);
                 ghost.targetRotationY = p.ry;
+                ghost.targetTransportMode = p.transportMode || "walk";
                 ghost.lastUpdate = now;
             });
 
@@ -792,12 +811,37 @@ window.tsFamilyEngine = {
 
         // Interpolation loop for ghosts
         this.scene.onBeforeRenderObservable.add(() => {
+            const now = Date.now();
             for (let id in this.ghostPlayers) {
                 const ghost = this.ghostPlayers[id];
                 if (ghost.targetPosition) {
+                    const wasMoving = BABYLON.Vector3.Distance(ghost.position, ghost.targetPosition) > 0.05;
+
                     // Smoothly LERP position and rotation
                     ghost.position = BABYLON.Vector3.Lerp(ghost.position, ghost.targetPosition, 0.1);
                     ghost.rotation.y = BABYLON.Scalar.LerpAngle(ghost.rotation.y, ghost.targetRotationY, 0.1);
+
+                    // Handle Skateboard visibility
+                    if (ghost.skateboard) {
+                        ghost.skateboard.setEnabled(ghost.targetTransportMode === "skate");
+                    }
+
+                    // Simple Ghost Animation
+                    if (wasMoving) {
+                        const isSkating = ghost.targetTransportMode === "skate";
+                        const swing = Math.sin(now * 0.008) * 0.25;
+
+                        // Find child meshes (simplified for ghosts since we didn't store limb refs like we did for local player)
+                        // Actually, spawnGhost uses fixed child names, let's find them
+                        ghost.getChildMeshes().forEach(m => {
+                            if (m.name === "leftLegGhost") {
+                                m.rotation.x = isSkating ? 0.2 : swing;
+                            }
+                            if (m.name === "rightLegGhost") {
+                                m.rotation.x = isSkating ? -swing * 2 : -swing;
+                            }
+                        });
+                    }
                 }
             }
         });
@@ -864,8 +908,10 @@ window.tsFamilyEngine = {
         const nameMaterial = new BABYLON.StandardMaterial("nameMatGhost", this.scene);
         nameMaterial.diffuseTexture = nameTexture;
         nameMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
-        nameMaterial.backFaceCulling = false;
         namePlane.material = nameMaterial;
+
+        // Ghost Skateboard
+        ghost.skateboard = this.createSkateboard(ghost);
 
         this.ghostPlayers[id] = ghost;
     },
@@ -893,7 +939,8 @@ window.tsFamilyEngine = {
                         this.userId,
                         this.userName,
                         pos,
-                        rot
+                        rot,
+                        this.transportMode
                     );
                 }
             }
@@ -917,6 +964,61 @@ window.tsFamilyEngine = {
     sendChat: function (message) {
         if (window.firebaseManager) {
             window.firebaseManager.sendChatMessage(this.userId, this.userName, message);
+        }
+    },
+
+    createSkateboard: function (parent = null) {
+        const root = parent || this.player;
+        const boardRoot = new BABYLON.TransformNode("skateboardRoot", this.scene);
+        boardRoot.parent = root;
+        boardRoot.position.y = 0.1;
+        boardRoot.setEnabled(false);
+
+        const deckMat = new BABYLON.StandardMaterial("deckMat", this.scene);
+        deckMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+
+        const wheelMat = new BABYLON.StandardMaterial("wheelMat", this.scene);
+        wheelMat.diffuseColor = new BABYLON.Color3(0.8, 0.8, 0.8);
+
+        // Deck
+        const deck = BABYLON.MeshBuilder.CreateBox("deck", { width: 0.5, height: 0.05, depth: 1.2 }, this.scene);
+        deck.parent = boardRoot;
+        deck.material = deckMat;
+
+        // Wheels
+        const wheelPositions = [
+            { x: -0.2, z: 0.4 }, { x: 0.2, z: 0.4 },
+            { x: -0.2, z: -0.4 }, { x: 0.2, z: -0.4 }
+        ];
+
+        wheelPositions.forEach((wp, i) => {
+            const wheel = BABYLON.MeshBuilder.CreateCylinder("wheel_" + i, { diameter: 0.15, height: 0.1 }, this.scene);
+            wheel.parent = boardRoot;
+            wheel.position.set(wp.x, -0.05, wp.z);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.material = wheelMat;
+        });
+
+        if (!parent) {
+            this.player.skateboard = boardRoot;
+        }
+        return boardRoot;
+    },
+
+    setSkateboardVisibility: function (visible) {
+        if (this.player && this.player.skateboard) {
+            this.player.skateboard.setEnabled(visible);
+        }
+    },
+
+    setTransportMode: function (mode) {
+        this.transportMode = mode;
+        this.setSkateboardVisibility(mode === "skate");
+    },
+
+    scrollToBottom: function (element) {
+        if (element) {
+            element.scrollTop = element.scrollHeight;
         }
     }
 };
