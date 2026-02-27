@@ -146,31 +146,26 @@ window.tsFamilyEngine = {
         if (obj.ry) container.rotation.y = obj.ry;
 
         if (obj.type === "apple_tree") {
-            this.createVoxelTree(container, bp, obj.seed || 123);
+            this.createVoxelTree(container, bp, obj.seed || 123, obj.id);
         } else if (obj.type === "park_bench") {
-            this.createVoxelBench(container, bp);
+            this.createVoxelBench(container, bp, obj.id);
         } else if (obj.type === "red_house") {
-            this.createVoxelHouse(container, bp);
+            this.createVoxelHouse(container, bp, obj.id);
         } else if (bp.recipe) {
-            this.createVoxelRecipe(container, bp);
+            this.createVoxelRecipe(container, bp, obj.id);
         } else {
             // Default placeholder
-            const box = BABYLON.MeshBuilder.CreateBox("box_" + obj.id, { size: 1 }, this.scene);
+            const box = BABYLON.MeshBuilder.CreateBox("object_" + obj.id, { size: 1 }, this.scene);
             box.parent = container;
             box.position.y = 0.5;
+            box.isPickable = true;
         }
 
         this.worldObjects[obj.id] = container;
         container.blueprintId = obj.type; // For identification
-
-        // Ensure all child meshes are pickable for bulldozer if we want to click any part of it
-        container.getChildMeshes().forEach(m => {
-            m.name = "object_" + obj.id; // Force name for picking
-            m.isPickable = true;
-        });
     },
 
-    createVoxelTree: function (parent, bp, seed) {
+    createVoxelTree: function (parent, bp, seed, objId) {
         const trunkMat = new BABYLON.StandardMaterial("trunkMat", this.scene);
         trunkMat.diffuseColor = BABYLON.Color3.FromHexString(bp.trunkColor);
 
@@ -179,23 +174,25 @@ window.tsFamilyEngine = {
 
         // Trunk
         const trunkHeight = bp.baseTrunkHeight;
-        const trunk = BABYLON.MeshBuilder.CreateBox("trunk", { width: bp.baseTrunkWidth, height: trunkHeight, depth: bp.baseTrunkWidth }, this.scene);
+        const trunk = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: bp.baseTrunkWidth, height: trunkHeight, depth: bp.baseTrunkWidth }, this.scene);
         trunk.parent = parent;
         trunk.position.y = trunkHeight / 2;
         trunk.material = trunkMat;
+        trunk.isPickable = true;
 
         // "Foliage" (Voxel Blob)
-        const crown = BABYLON.MeshBuilder.CreateBox("crown", { size: bp.crownSize }, this.scene);
+        const crown = BABYLON.MeshBuilder.CreateBox("object_" + objId, { size: bp.crownSize }, this.scene);
         crown.parent = parent;
         crown.position.y = trunkHeight + (bp.crownSize / 2) - 0.2;
         crown.material = leafMat;
+        crown.isPickable = true;
 
         // Mini "Apples"
         const appleMat = new BABYLON.StandardMaterial("appleMat", this.scene);
         appleMat.diffuseColor = BABYLON.Color3.FromHexString(bp.appleColor);
 
         for (let i = 0; i < 5; i++) {
-            const apple = BABYLON.MeshBuilder.CreateBox("apple", { size: 0.15 }, this.scene);
+            const apple = BABYLON.MeshBuilder.CreateBox("object_" + objId, { size: 0.15 }, this.scene);
             apple.parent = crown;
             // Pseudo-random placement based on seed
             const offset = (i + seed) % 10 / 10;
@@ -205,10 +202,11 @@ window.tsFamilyEngine = {
                 (Math.sin(i * 3.7 + seed) * 0.4) * bp.crownSize
             );
             apple.material = appleMat;
+            apple.isPickable = true;
         }
     },
 
-    createVoxelBench: function (parent, bp) {
+    createVoxelBench: function (parent, bp, objId) {
         const woodMat = new BABYLON.StandardMaterial("woodMat", this.scene);
         woodMat.diffuseColor = BABYLON.Color3.FromHexString(bp.woodColor);
 
@@ -216,33 +214,37 @@ window.tsFamilyEngine = {
         metalMat.diffuseColor = BABYLON.Color3.FromHexString(bp.metalColor);
 
         // Seat
-        const seat = BABYLON.MeshBuilder.CreateBox("seat", { width: bp.width, height: 0.1, depth: bp.depth }, this.scene);
+        const seat = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: bp.width, height: 0.1, depth: bp.depth }, this.scene);
         seat.parent = parent;
         seat.position.y = 0.5;
         seat.material = woodMat;
+        seat.isPickable = true;
 
         // Backrest
-        const back = BABYLON.MeshBuilder.CreateBox("back", { width: bp.width, height: 0.5, depth: 0.1 }, this.scene);
+        const back = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: bp.width, height: 0.5, depth: 0.1 }, this.scene);
         back.parent = parent;
         back.position.y = 0.8;
         back.position.z = bp.depth / 2;
         back.material = woodMat;
+        back.isPickable = true;
 
         // Legs (Simplified)
-        const legLeft = BABYLON.MeshBuilder.CreateBox("legL", { width: 0.1, height: 0.5, depth: bp.depth }, this.scene);
+        const legLeft = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: 0.1, height: 0.5, depth: bp.depth }, this.scene);
         legLeft.parent = parent;
         legLeft.position.x = -bp.width / 2 + 0.1;
         legLeft.position.y = 0.25;
         legLeft.material = metalMat;
+        legLeft.isPickable = true;
 
-        const legRight = BABYLON.MeshBuilder.CreateBox("legR", { width: 0.1, height: 0.5, depth: bp.depth }, this.scene);
+        const legRight = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: 0.1, height: 0.5, depth: bp.depth }, this.scene);
         legRight.parent = parent;
         legRight.position.x = bp.width / 2 - 0.1;
         legRight.position.y = 0.25;
         legRight.material = metalMat;
+        legRight.isPickable = true;
     },
 
-    createVoxelHouse: function (parent, bp) {
+    createVoxelHouse: function (parent, bp, objId) {
         const wallMat = new BABYLON.StandardMaterial("wallMat", this.scene);
         wallMat.diffuseColor = BABYLON.Color3.FromHexString(bp.wallColor);
 
@@ -253,33 +255,37 @@ window.tsFamilyEngine = {
         roofMat.diffuseColor = BABYLON.Color3.FromHexString(bp.roofColor);
 
         // Main Structure
-        const wall = BABYLON.MeshBuilder.CreateBox("wall", { width: 3, height: 2.5, depth: 4 }, this.scene);
+        const wall = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: 3, height: 2.5, depth: 4 }, this.scene);
         wall.parent = parent;
         wall.position.y = 1.25;
         wall.material = wallMat;
         wall.checkCollisions = true;
+        wall.isPickable = true;
 
         // Roof (Traditional Gable)
-        const roof = BABYLON.MeshBuilder.CreateCylinder("roof", { diameter: 4.5, height: 3.2, tessellation: 3 }, this.scene);
+        const roof = BABYLON.MeshBuilder.CreateCylinder("object_" + objId, { diameter: 4.5, height: 3.2, tessellation: 3 }, this.scene);
         roof.parent = parent;
         roof.position.y = 3;
         roof.rotation.z = Math.PI / 2;
         roof.material = roofMat;
+        roof.isPickable = true;
 
         // Door
-        const door = BABYLON.MeshBuilder.CreateBox("door", { width: 0.8, height: 1.4, depth: 0.1 }, this.scene);
+        const door = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: 0.8, height: 1.4, depth: 0.1 }, this.scene);
         door.parent = parent;
         door.position = new BABYLON.Vector3(0, 0.7, -2.01);
         door.material = trimMat;
+        door.isPickable = true;
 
         // Window Frames
-        const windowFrame = BABYLON.MeshBuilder.CreateBox("window", { width: 0.8, height: 0.8, depth: 0.1 }, this.scene);
+        const windowFrame = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: 0.8, height: 0.8, depth: 0.1 }, this.scene);
         windowFrame.parent = parent;
         windowFrame.position = new BABYLON.Vector3(0.8, 1.8, -2.01);
         windowFrame.material = trimMat;
+        windowFrame.isPickable = true;
     },
 
-    createVoxelRecipe: async function (parent, bp) {
+    createVoxelRecipe: async function (parent, bp, objId) {
         try {
             const response = await fetch(bp.recipe);
             const data = await response.json();
@@ -289,14 +295,14 @@ window.tsFamilyEngine = {
             const registry = new Map();
 
             parts.forEach(p => {
-                this.createProp(p, parent, registry);
+                this.createProp(p, parent, registry, objId);
             });
         } catch (e) {
             console.error("Error rendering recipe:", e);
         }
     },
 
-    createProp: function (config, root, registry) {
+    createProp: function (config, root, registry, objId) {
         const getVal = (obj, prop) => {
             if (!obj) return null;
             if (obj[prop] !== undefined) return obj[prop];
@@ -321,10 +327,13 @@ window.tsFamilyEngine = {
         const pos = parseVec3(getVal(config, "Position"));
         const rot = parseVec3(getVal(config, "Rotation"));
 
+        // Use the building's object ID for the mesh name so the bulldozer can find it
+        const meshName = "object_" + objId;
+
         let mesh;
-        if (shape === "sphere") mesh = BABYLON.MeshBuilder.CreateSphere(id, { diameter: 1 }, this.scene);
-        else if (shape === "cylinder") mesh = BABYLON.MeshBuilder.CreateCylinder(id, { diameter: 1, height: 1 }, this.scene);
-        else mesh = BABYLON.MeshBuilder.CreateBox(id, { size: 1 }, this.scene);
+        if (shape === "sphere") mesh = BABYLON.MeshBuilder.CreateSphere(meshName, { diameter: 1 }, this.scene);
+        else if (shape === "cylinder") mesh = BABYLON.MeshBuilder.CreateCylinder(meshName, { diameter: 1, height: 1 }, this.scene);
+        else mesh = BABYLON.MeshBuilder.CreateBox(meshName, { size: 1 }, this.scene);
 
         mesh.scaling = scale;
         mesh.position = pos;
@@ -342,6 +351,7 @@ window.tsFamilyEngine = {
         }
 
         mesh.material = this.createPBR(id, config);
+        mesh.isPickable = true;
         registry.set(id, mesh);
     },
 
