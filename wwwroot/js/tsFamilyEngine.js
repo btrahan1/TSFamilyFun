@@ -1026,6 +1026,44 @@ window.tsFamilyEngine = {
         }
     },
 
+    createSkateboard: function (parent = null) {
+        const root = parent || this.player;
+        const boardRoot = new BABYLON.TransformNode("skateboardRoot", this.scene);
+        boardRoot.parent = root;
+        boardRoot.position.y = 0.1;
+        boardRoot.setEnabled(false);
+
+        const deckMat = new BABYLON.StandardMaterial("deckMat", this.scene);
+        deckMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+
+        const wheelMat = new BABYLON.StandardMaterial("wheelMat", this.scene);
+        wheelMat.diffuseColor = new BABYLON.Color3(0.8, 0.8, 0.8);
+
+        // Deck
+        const deck = BABYLON.MeshBuilder.CreateBox("deck", { width: 0.5, height: 0.05, depth: 1.2 }, this.scene);
+        deck.parent = boardRoot;
+        deck.material = deckMat;
+
+        // Wheels
+        const wheelPositions = [
+            { x: -0.2, z: 0.4 }, { x: 0.2, z: 0.4 },
+            { x: -0.2, z: -0.4 }, { x: 0.2, z: -0.4 }
+        ];
+
+        wheelPositions.forEach((wp, i) => {
+            const wheel = BABYLON.MeshBuilder.CreateCylinder("wheel_" + i, { diameter: 0.15, height: 0.1 }, this.scene);
+            wheel.parent = boardRoot;
+            wheel.position.set(wp.x, -0.05, wp.z);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.material = wheelMat;
+        });
+
+        if (!parent) {
+            this.player.skateboard = boardRoot;
+        }
+        return boardRoot;
+    },
+
     createScooter: function (parent = null) {
         const root = parent || this.player;
         const scooterRoot = new BABYLON.TransformNode("scooterRoot", this.scene);
