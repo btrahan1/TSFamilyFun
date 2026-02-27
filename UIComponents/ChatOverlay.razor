@@ -11,7 +11,8 @@
         }
     </div>
     <div class="chat-input-area">
-        <input type="text" @bind="CurrentMessage" @bind:event="oninput" @onkeyup="HandleKeyUp" placeholder="Press Enter to chat..." class="chat-input" />
+        <input type="text" @bind="CurrentMessage" @bind:event="oninput" @onkeyup="HandleKeyUp" placeholder="Chat..." class="chat-input" />
+        <button class="chat-send-btn" @onclick="SendMessage">↵</button>
     </div>
 </div>
 
@@ -21,12 +22,20 @@
     
     private string CurrentMessage { get; set; } = "";
 
-    private async Task HandleKeyUp(KeyboardEventArgs e)
+    private async Task SendMessage()
     {
-        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(CurrentMessage))
+        if (!string.IsNullOrWhiteSpace(CurrentMessage))
         {
             await OnSendMessage.InvokeAsync(CurrentMessage);
             CurrentMessage = "";
+        }
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
         }
     }
 }
@@ -34,10 +43,10 @@
 <style>
     .chat-container {
         position: absolute;
-        bottom: 20px;
+        bottom: 80px; /* Moved up for mobile/keyboard clearance */
         left: 20px;
-        width: 350px;
-        height: 250px;
+        width: 320px;
+        max-height: 25vh; /* Quarter of the screen at most */
         display: flex;
         flex-direction: column;
         padding: 10px;
@@ -53,14 +62,15 @@
         gap: 4px;
         padding-right: 5px;
     }
-
+    
+    /* Custom Scrollbar */
     .chat-history::-webkit-scrollbar {
-        width: 4px;
+        width: 6px;
     }
 
     .chat-history::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 2px;
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 3px;
     }
 
     .chat-entry {
@@ -77,15 +87,17 @@
     }
 
     .chat-input-area {
+        display: flex;
+        gap: 8px;
         height: 40px;
     }
 
     .chat-input {
-        width: 100%;
+        flex: 1;
         height: 100%;
         background: rgba(255, 255, 255, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 4px;
+        border-radius: 6px;
         padding: 0 10px;
         color: var(--white);
         outline: none;
@@ -93,5 +105,25 @@
 
     .chat-input:focus {
         border-color: var(--accent-yellow);
+    }
+
+    .chat-send-btn {
+        width: 45px;
+        height: 100%;
+        background: var(--accent-yellow);
+        border: none;
+        border-radius: 6px;
+        color: #333;
+        font-size: 1.2rem;
+        font-weight: bold;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.1s;
+    }
+
+    .chat-send-btn:active {
+        transform: scale(0.95);
     }
 </style>
