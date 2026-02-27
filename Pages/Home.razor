@@ -33,6 +33,7 @@
                         <div class="asset-item @(SelectedAsset == "stavanger_pub" ? "selected" : "")" @onclick="@(() => SelectAsset("stavanger_pub"))">🍻 Stavanger Pub</div>
                         <div class="asset-item @(SelectedAsset == "stavanger_burger" ? "selected" : "")" @onclick="@(() => SelectAsset("stavanger_burger"))">🍔 Stavanger Burger</div>
                         <div class="asset-item @(SelectedAsset == "stavanger_pizza" ? "selected" : "")" @onclick="@(() => SelectAsset("stavanger_pizza"))">🍕 Stavanger Pizza</div>
+                        <div class="asset-item @(SelectedAsset == "street_light" ? "selected" : "")" @onclick="@(() => SelectAsset("street_light"))">🏮 Street Light</div>
                     </div>
                     <div class="build-tools">
                         <button class="bulldozer-btn @(IsBulldozerMode ? "active" : "")" @onclick="ToggleBulldozer">🚜 Bulldozer</button>
@@ -47,6 +48,7 @@
                     <div class="asset-list">
                         <div class="asset-item @(TransportMode == "walk" ? "selected" : "")" @onclick="@(() => SetTransport("walk"))">🚶 Walking</div>
                         <div class="asset-item @(TransportMode == "skate" ? "selected" : "")" @onclick="@(() => SetTransport("skate"))">🛹 Skateboard</div>
+                        <div class="asset-item @(TransportMode == "scooter" ? "selected" : "")" @onclick="@(() => SetTransport("scooter"))">🛴 Scooter</div>
                     </div>
                 </div>
             }

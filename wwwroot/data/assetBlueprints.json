@@ -45,6 +45,13 @@
             "name": "Stavanger Pizza",
             "category": "building",
             "recipe": "data/props/stavanger_pizza.json"
+        },
+        {
+            "id": "street_light",
+            "name": "Street Light",
+            "category": "furniture",
+            "poleColor": "#424242",
+            "bulbColor": "#FFF176"
         }
     ]
 }

@@ -27,7 +27,7 @@ window.tsFamilyEngine = {
     moveMarker: null,
     lastTapTime: 0,
     isBulldozing: false,
-    transportMode: "walk", // walk, skate
+    transportMode: "walk", // walk, skate, scooter
 
     init: async function (canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -152,6 +152,8 @@ window.tsFamilyEngine = {
             this.createVoxelBench(container, bp, obj.id);
         } else if (obj.type === "red_house") {
             this.createVoxelHouse(container, bp, obj.id);
+        } else if (obj.type === "street_light") {
+            this.createVoxelStreetLight(container, bp, obj.id);
         } else if (bp.recipe) {
             this.createVoxelRecipe(container, bp, obj.id);
         } else {
@@ -284,6 +286,46 @@ window.tsFamilyEngine = {
         windowFrame.position = new BABYLON.Vector3(0.8, 1.8, -2.01);
         windowFrame.material = trimMat;
         windowFrame.isPickable = true;
+    },
+
+    createVoxelStreetLight: function (parent, bp, objId) {
+        const metalMat = new BABYLON.PBRMaterial("metalMat", this.scene);
+        metalMat.albedoColor = BABYLON.Color3.FromHexString(bp.poleColor);
+        metalMat.metallic = 0.8;
+        metalMat.roughness = 0.2;
+
+        const bulbMat = new BABYLON.PBRMaterial("bulbMat", this.scene);
+        bulbMat.albedoColor = BABYLON.Color3.FromHexString(bp.bulbColor);
+        bulbMat.emissiveColor = BABYLON.Color3.FromHexString(bp.bulbColor);
+        bulbMat.emissiveIntensity = 2.0;
+
+        // Pole
+        const pole = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: 0.2, height: 4, depth: 0.2 }, this.scene);
+        pole.parent = parent;
+        pole.position.y = 2;
+        pole.material = metalMat;
+        pole.isPickable = true;
+
+        // Arm
+        const arm = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: 1.0, height: 0.15, depth: 0.15 }, this.scene);
+        arm.parent = parent;
+        arm.position.set(0.4, 3.8, 0);
+        arm.material = metalMat;
+        arm.isPickable = true;
+
+        // Lantern / Bulb
+        const bulb = BABYLON.MeshBuilder.CreateBox("object_" + objId, { width: 0.5, height: 0.5, depth: 0.5 }, this.scene);
+        bulb.parent = parent;
+        bulb.position.set(0.8, 3.5, 0);
+        bulb.material = bulbMat;
+        bulb.isPickable = true;
+
+        // The Actual Light
+        const light = new BABYLON.PointLight("light_" + objId, new BABYLON.Vector3(0.8, 3.5, 0), this.scene);
+        light.parent = parent;
+        light.diffuse = BABYLON.Color3.FromHexString(bp.bulbColor);
+        light.intensity = 1.0;
+        light.range = 15;
     },
 
     createVoxelRecipe: async function (parent, bp, objId) {
@@ -551,7 +593,8 @@ window.tsFamilyEngine = {
     hasJoined: false,
     handleMovement: function () {
         const isSkating = this.transportMode === "skate";
-        const speed = isSkating ? 0.25 : 0.15;
+        const isScooting = this.transportMode === "scooter";
+        const speed = isScooting ? 0.28 : (isSkating ? 0.25 : 0.15);
         const rotateSpeed = 0.04;
         let isMoving = false;
 
@@ -607,20 +650,26 @@ window.tsFamilyEngine = {
 
         // Animate Limbs
         if (isMoving) {
-            this.walkTimer += isSkating ? 0.08 : 0.125;
+            this.walkTimer += (isSkating || isScooting) ? 0.08 : 0.125;
             const swing = Math.sin(this.walkTimer) * 0.25;
 
             if (isSkating) {
                 // Skateboard Animation (Pushing)
-                // Left leg stays on board, slightly bent
                 this.player.limbs.leftLeg.rotation.x = 0.2;
-                // Right leg pushes
                 this.player.limbs.rightLeg.rotation.x = -swing * 2;
-                // Arms for balance
                 this.player.limbs.leftArm.rotation.x = -0.4;
                 this.player.limbs.rightArm.rotation.x = 0.4;
-                // Slight torso lean
                 this.player.limbs.torso.rotation.x = 0.15;
+            } else if (isScooting) {
+                // Scooter Animation
+                // Hands on handlebars
+                this.player.limbs.leftArm.rotation.x = 1.0;
+                this.player.limbs.rightArm.rotation.x = 1.0;
+                // Left leg on deck
+                this.player.limbs.leftLeg.rotation.x = 0.1;
+                // Right leg pushes
+                this.player.limbs.rightLeg.rotation.x = -swing * 2.2;
+                this.player.limbs.torso.rotation.x = 0.1;
             } else {
                 // Walking Animation
                 this.player.limbs.leftLeg.rotation.x = swing;
@@ -749,6 +798,8 @@ window.tsFamilyEngine = {
 
         // Skateboard (hidden by default)
         this.createSkateboard();
+        // Scooter (hidden by default)
+        this.createScooter();
 
         // Name tag
         const dynamicTexture = new BABYLON.DynamicTexture("nameTag", { width: 512, height: 256 }, this.scene);
@@ -821,24 +872,31 @@ window.tsFamilyEngine = {
                     ghost.position = BABYLON.Vector3.Lerp(ghost.position, ghost.targetPosition, 0.1);
                     ghost.rotation.y = BABYLON.Scalar.LerpAngle(ghost.rotation.y, ghost.targetRotationY, 0.1);
 
-                    // Handle Skateboard visibility
+                    // Handle Transport visibility
                     if (ghost.skateboard) {
                         ghost.skateboard.setEnabled(ghost.targetTransportMode === "skate");
+                    }
+                    if (ghost.scooter) {
+                        ghost.scooter.setEnabled(ghost.targetTransportMode === "scooter");
                     }
 
                     // Simple Ghost Animation
                     if (wasMoving) {
                         const isSkating = ghost.targetTransportMode === "skate";
+                        const isScooting = ghost.targetTransportMode === "scooter";
                         const swing = Math.sin(now * 0.008) * 0.25;
-
-                        // Find child meshes (simplified for ghosts since we didn't store limb refs like we did for local player)
-                        // Actually, spawnGhost uses fixed child names, let's find them
                         ghost.getChildMeshes().forEach(m => {
                             if (m.name === "leftLegGhost") {
-                                m.rotation.x = isSkating ? 0.2 : swing;
+                                m.rotation.x = (isSkating || isScooting) ? 0.2 : swing;
                             }
                             if (m.name === "rightLegGhost") {
-                                m.rotation.x = isSkating ? -swing * 2 : -swing;
+                                m.rotation.x = (isSkating || isScooting) ? -swing * 2 : -swing;
+                            }
+                            if (m.name === "leftArmGhost") {
+                                m.rotation.x = isScooting ? 1.0 : (isSkating ? -0.4 : -swing);
+                            }
+                            if (m.name === "rightArmGhost") {
+                                m.rotation.x = isScooting ? 1.0 : (isSkating ? 0.4 : swing);
                             }
                         });
                     }
@@ -910,8 +968,9 @@ window.tsFamilyEngine = {
         nameMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
         namePlane.material = nameMaterial;
 
-        // Ghost Skateboard
+        // Ghost Skateboard & Scooter
         ghost.skateboard = this.createSkateboard(ghost);
+        ghost.scooter = this.createScooter(ghost);
 
         this.ghostPlayers[id] = ghost;
     },
@@ -967,53 +1026,82 @@ window.tsFamilyEngine = {
         }
     },
 
-    createSkateboard: function (parent = null) {
+    createScooter: function (parent = null) {
         const root = parent || this.player;
-        const boardRoot = new BABYLON.TransformNode("skateboardRoot", this.scene);
-        boardRoot.parent = root;
-        boardRoot.position.y = 0.1;
-        boardRoot.setEnabled(false);
+        const scooterRoot = new BABYLON.TransformNode("scooterRoot", this.scene);
+        scooterRoot.parent = root;
+        scooterRoot.position.y = 0.1;
+        scooterRoot.setEnabled(false);
 
-        const deckMat = new BABYLON.StandardMaterial("deckMat", this.scene);
-        deckMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+        const metalMat = new BABYLON.StandardMaterial("scooterMetalMat", this.scene);
+        metalMat.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.7);
 
-        const wheelMat = new BABYLON.StandardMaterial("wheelMat", this.scene);
-        wheelMat.diffuseColor = new BABYLON.Color3(0.8, 0.8, 0.8);
+        const deckMat = new BABYLON.StandardMaterial("scooterDeckMat", this.scene);
+        deckMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        const wheelMat = new BABYLON.StandardMaterial("scooterWheelMat", this.scene);
+        wheelMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
 
         // Deck
-        const deck = BABYLON.MeshBuilder.CreateBox("deck", { width: 0.5, height: 0.05, depth: 1.2 }, this.scene);
-        deck.parent = boardRoot;
+        const deck = BABYLON.MeshBuilder.CreateBox("scooterDeck", { width: 0.4, height: 0.05, depth: 1.0 }, this.scene);
+        deck.parent = scooterRoot;
         deck.material = deckMat;
 
-        // Wheels
-        const wheelPositions = [
-            { x: -0.2, z: 0.4 }, { x: 0.2, z: 0.4 },
-            { x: -0.2, z: -0.4 }, { x: 0.2, z: -0.4 }
-        ];
+        // Steering Column
+        const pole = BABYLON.MeshBuilder.CreateBox("scooterPole", { width: 0.05, height: 1.4, depth: 0.05 }, this.scene);
+        pole.parent = scooterRoot;
+        pole.position.set(0, 0.7, -0.45);
+        pole.material = metalMat;
 
-        wheelPositions.forEach((wp, i) => {
-            const wheel = BABYLON.MeshBuilder.CreateCylinder("wheel_" + i, { diameter: 0.15, height: 0.1 }, this.scene);
-            wheel.parent = boardRoot;
-            wheel.position.set(wp.x, -0.05, wp.z);
-            wheel.rotation.z = Math.PI / 2;
-            wheel.material = wheelMat;
-        });
+        // Handlebars
+        const bars = BABYLON.MeshBuilder.CreateBox("scooterBars", { width: 0.8, height: 0.05, depth: 0.05 }, this.scene);
+        bars.parent = pole;
+        bars.position.y = 0.7;
+        bars.material = metalMat;
+
+        // Grips
+        const gripMat = new BABYLON.StandardMaterial("gripMat", this.scene);
+        gripMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        const gripL = BABYLON.MeshBuilder.CreateBox("gripL", { width: 0.2, height: 0.06, depth: 0.06 }, this.scene);
+        gripL.parent = bars;
+        gripL.position.x = -0.3;
+        gripL.material = gripMat;
+
+        const gripR = BABYLON.MeshBuilder.CreateBox("gripR", { width: 0.2, height: 0.06, depth: 0.06 }, this.scene);
+        gripR.parent = bars;
+        gripR.position.x = 0.3;
+        gripR.material = gripMat;
+
+        // Wheels
+        const wheel1 = BABYLON.MeshBuilder.CreateCylinder("scooterWheel1", { diameter: 0.2, height: 0.08 }, this.scene);
+        wheel1.parent = scooterRoot;
+        wheel1.position.set(0, -0.05, 0.45);
+        wheel1.rotation.z = Math.PI / 2;
+        wheel1.material = wheelMat;
+
+        const wheel2 = BABYLON.MeshBuilder.CreateCylinder("scooterWheel2", { diameter: 0.2, height: 0.08 }, this.scene);
+        wheel2.parent = scooterRoot;
+        wheel2.position.set(0, -0.05, -0.45);
+        wheel2.rotation.z = Math.PI / 2;
+        wheel2.material = wheelMat;
 
         if (!parent) {
-            this.player.skateboard = boardRoot;
+            this.player.scooter = scooterRoot;
         }
-        return boardRoot;
+        return scooterRoot;
     },
 
-    setSkateboardVisibility: function (visible) {
-        if (this.player && this.player.skateboard) {
-            this.player.skateboard.setEnabled(visible);
+    setTransportVisibility: function (mode) {
+        if (this.player) {
+            if (this.player.skateboard) this.player.skateboard.setEnabled(mode === "skate");
+            if (this.player.scooter) this.player.scooter.setEnabled(mode === "scooter");
         }
     },
 
     setTransportMode: function (mode) {
         this.transportMode = mode;
-        this.setSkateboardVisibility(mode === "skate");
+        this.setTransportVisibility(mode);
     },
 
     scrollToBottom: function (element) {
