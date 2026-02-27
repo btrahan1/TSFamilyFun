@@ -15,6 +15,9 @@ window.tsFamilyEngine = {
     userName: "User",
     ghostPlayers: {},
     syncTimer: 0,
+    lastSyncedPos: null,
+    lastSyncedRot: null,
+    lastHeartbeat: 0,
 
     init: function (canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -436,15 +439,30 @@ window.tsFamilyEngine = {
 
     updateSync: function () {
         this.syncTimer++;
-        if (this.syncTimer >= 12) { // Every ~12 frames (~200ms)
+        if (this.syncTimer >= 18) { // Every ~300ms
             this.syncTimer = 0;
             if (window.firebaseManager && this.player) {
-                window.firebaseManager.updatePlayerPosition(
-                    this.userId,
-                    this.userName,
-                    this.player.position,
-                    this.player.rotation
-                );
+                const pos = this.player.position;
+                const rot = this.player.rotation;
+                const now = Date.now();
+
+                // Dirty check: has moved or rotated?
+                const moved = !this.lastSyncedPos || BABYLON.Vector3.Distance(pos, this.lastSyncedPos) > 0.05;
+                const rotated = !this.lastSyncedRot || Math.abs(rot.y - this.lastSyncedRot.y) > 0.1;
+                const heartbeat = (now - this.lastHeartbeat) > 30000; // Heartbeat every 30s
+
+                if (moved || rotated || heartbeat) {
+                    this.lastSyncedPos = pos.clone();
+                    this.lastSyncedRot = rot.clone();
+                    this.lastHeartbeat = now;
+
+                    window.firebaseManager.updatePlayerPosition(
+                        this.userId,
+                        this.userName,
+                        pos,
+                        rot
+                    );
+                }
             }
         }
     },
