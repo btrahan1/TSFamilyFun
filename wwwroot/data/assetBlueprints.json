@@ -1,0 +1,32 @@
+{
+    "blueprints": [
+        {
+            "id": "apple_tree",
+            "name": "Apple Tree",
+            "category": "nature",
+            "trunkColor": "#5D4037",
+            "leafColor": "#2E7D32",
+            "appleColor": "#D32F2F",
+            "baseTrunkHeight": 2.0,
+            "baseTrunkWidth": 0.4,
+            "crownSize": 2.5
+        },
+        {
+            "id": "park_bench",
+            "name": "Park Bench",
+            "category": "furniture",
+            "woodColor": "#8D6E63",
+            "metalColor": "#424242",
+            "width": 1.5,
+            "depth": 0.6
+        },
+        {
+            "id": "red_house",
+            "name": "Stavanger House",
+            "category": "building",
+            "wallColor": "#C62828",
+            "trimColor": "#FFFFFF",
+            "roofColor": "#37474F"
+        }
+    ]
+}

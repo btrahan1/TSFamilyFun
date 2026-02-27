@@ -66,5 +66,31 @@ window.firebaseManager = {
                 }
             });
         });
+    },
+
+    // World Objects
+    placeWorldObject: async function (objectData) {
+        try {
+            const id = Math.random().toString(36).substr(2, 9);
+            await setDoc(doc(this.db, "world_objects", id), {
+                ...objectData,
+                id: id,
+                timestamp: serverTimestamp()
+            });
+            console.log("Object placed:", id);
+        } catch (e) {
+            console.error("Error placing object: ", e);
+        }
+    },
+
+    listenForWorldObjects: function (callback) {
+        const q = query(collection(this.db, "world_objects"));
+        return onSnapshot(q, (snapshot) => {
+            const objects = [];
+            snapshot.forEach((doc) => {
+                objects.push(doc.data());
+            });
+            callback(objects);
+        });
     }
 };

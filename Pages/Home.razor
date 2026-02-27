@@ -14,7 +14,22 @@
             <div class="top-hud glass-panel">
                 <span class="hud-name">@CurrentUserName</span>
                 <span class="hud-status">Online</span>
+                <button class="build-toggle @(IsBuildMode ? "active" : "")" @onclick="ToggleBuildMode">
+                    @(IsBuildMode ? "🔨 Exit Build" : "🔨 Build")
+                </button>
             </div>
+
+            @if (IsBuildMode)
+            {
+                <div class="build-menu glass-panel">
+                    <span class="menu-title">Blueprints</span>
+                    <div class="asset-list">
+                        <div class="asset-item @(SelectedAsset == "apple_tree" ? "selected" : "")" @onclick="@(() => SelectAsset("apple_tree"))">🍎 Apple Tree</div>
+                        <div class="asset-item @(SelectedAsset == "park_bench" ? "selected" : "")" @onclick="@(() => SelectAsset("park_bench"))">🛋️ Park Bench</div>
+                        <div class="asset-item @(SelectedAsset == "red_house" ? "selected" : "")" @onclick="@(() => SelectAsset("red_house"))">🏠 Red House</div>
+                    </div>
+                </div>
+            }
 
             <ChatOverlay Messages="ChatMessages" OnSendMessage="SendMessage" />
         }
@@ -27,6 +42,8 @@
     private bool HasJoined = false;
     private string CurrentUserName = "";
     private List<ChatMessage> ChatMessages = new();
+    private bool IsBuildMode = false;
+    private string SelectedAsset = "apple_tree";
     private DotNetObjectReference<Home>? objRef;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -63,6 +80,18 @@
         await JSRuntime.InvokeVoidAsync("tsFamilyEngine.sendChat", message);
     }
 
+    private async Task ToggleBuildMode()
+    {
+        IsBuildMode = !IsBuildMode;
+        await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", IsBuildMode, SelectedAsset);
+    }
+
+    private async Task SelectAsset(string assetId)
+    {
+        SelectedAsset = assetId;
+        await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", IsBuildMode, SelectedAsset);
+    }
+
     public void Dispose()
     {
         objRef?.Dispose();
@@ -90,5 +119,69 @@
         color: #4caf50;
         text-transform: uppercase;
         letter-spacing: 1px;
+    }
+
+    .build-toggle {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        transition: all 0.2s;
+        margin-left: 1rem;
+    }
+
+    .build-toggle:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .build-toggle.active {
+        background: #f44336;
+        border-color: #f44336;
+    }
+
+    .build-menu {
+        position: absolute;
+        top: 80px;
+        right: 20px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+        width: 200px;
+    }
+
+    .menu-title {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: rgba(255, 255, 255, 0.5);
+    }
+
+    .asset-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.4rem;
+    }
+
+    .asset-item {
+        padding: 0.6rem 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid transparent;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: white;
+    }
+
+    .asset-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .asset-item.selected {
+        background: rgba(76, 175, 80, 0.2);
+        border-color: #4caf50;
     }
 </style>

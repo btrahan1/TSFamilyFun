@@ -18,10 +18,18 @@ window.tsFamilyEngine = {
     lastSyncedPos: null,
     lastSyncedRot: null,
     lastHeartbeat: 0,
+    blueprints: {},
+    worldObjects: {},
+    isBuilding: false,
+    selectedBlueprintId: "apple_tree",
+    previewNode: null,
 
-    init: function (canvasId) {
+    init: async function (canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.engine = new BABYLON.Engine(this.canvas, true);
+
+        await this.loadAssets();
+
         this.scene = this.createScene();
 
         // Keyboard Input Handling
@@ -41,12 +49,188 @@ window.tsFamilyEngine = {
                 this.handleMovement();
                 this.updateSync();
             }
+            if (this.isBuilding) {
+                this.updatePlacementPreview();
+            }
             this.scene.render();
+        });
+
+        // Pointer Click Handling for Placement
+        this.scene.onPointerObservable.add((pointerInfo) => {
+            if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && this.isBuilding) {
+                const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => mesh.name === "ground");
+                if (pickInfo.hit) {
+                    this.placeObject(pickInfo.pickedPoint);
+                }
+            }
         });
 
         window.addEventListener("resize", () => {
             this.engine.resize();
         });
+
+        this.setupWorldSync();
+    },
+
+    loadAssets: async function () {
+        try {
+            const response = await fetch('data/assetBlueprints.json');
+            const data = await response.json();
+            data.blueprints.forEach(bp => {
+                this.blueprints[bp.id] = bp;
+            });
+            console.log("Blueprints loaded:", Object.keys(this.blueprints));
+        } catch (e) {
+            console.error("Error loading assets:", e);
+        }
+    },
+
+    setupWorldSync: function () {
+        if (!window.firebaseManager) {
+            setTimeout(() => this.setupWorldSync(), 500);
+            return;
+        }
+
+        window.firebaseManager.listenForWorldObjects((objects) => {
+            objects.forEach(obj => {
+                if (!this.worldObjects[obj.id]) {
+                    this.renderWorldObject(obj);
+                }
+            });
+        });
+    },
+
+    renderWorldObject: function (obj) {
+        const bp = this.blueprints[obj.type];
+        if (!bp) return;
+
+        const container = new BABYLON.TransformNode("object_" + obj.id, this.scene);
+        container.position = new BABYLON.Vector3(obj.x, obj.y, obj.z);
+        if (obj.ry) container.rotation.y = obj.ry;
+
+        if (obj.type === "apple_tree") {
+            this.createVoxelTree(container, bp, obj.seed || 123);
+        } else if (obj.type === "park_bench") {
+            this.createVoxelBench(container, bp);
+        } else if (obj.type === "red_house") {
+            this.createVoxelHouse(container, bp);
+        } else {
+            // Default placeholder
+            const box = BABYLON.MeshBuilder.CreateBox("box_" + obj.id, { size: 1 }, this.scene);
+            box.parent = container;
+            box.position.y = 0.5;
+        }
+
+        this.worldObjects[obj.id] = container;
+    },
+
+    createVoxelTree: function (parent, bp, seed) {
+        const trunkMat = new BABYLON.StandardMaterial("trunkMat", this.scene);
+        trunkMat.diffuseColor = BABYLON.Color3.FromHexString(bp.trunkColor);
+
+        const leafMat = new BABYLON.StandardMaterial("leafMat", this.scene);
+        leafMat.diffuseColor = BABYLON.Color3.FromHexString(bp.leafColor);
+
+        // Trunk
+        const trunkHeight = bp.baseTrunkHeight;
+        const trunk = BABYLON.MeshBuilder.CreateBox("trunk", { width: bp.baseTrunkWidth, height: trunkHeight, depth: bp.baseTrunkWidth }, this.scene);
+        trunk.parent = parent;
+        trunk.position.y = trunkHeight / 2;
+        trunk.material = trunkMat;
+
+        // "Foliage" (Voxel Blob)
+        const crown = BABYLON.MeshBuilder.CreateBox("crown", { size: bp.crownSize }, this.scene);
+        crown.parent = parent;
+        crown.position.y = trunkHeight + (bp.crownSize / 2) - 0.2;
+        crown.material = leafMat;
+
+        // Mini "Apples"
+        const appleMat = new BABYLON.StandardMaterial("appleMat", this.scene);
+        appleMat.diffuseColor = BABYLON.Color3.FromHexString(bp.appleColor);
+
+        for (let i = 0; i < 5; i++) {
+            const apple = BABYLON.MeshBuilder.CreateBox("apple", { size: 0.15 }, this.scene);
+            apple.parent = crown;
+            // Pseudo-random placement based on seed
+            const offset = (i + seed) % 10 / 10;
+            apple.position = new BABYLON.Vector3(
+                (Math.sin(i * 1.5 + seed) * 0.4) * bp.crownSize,
+                (Math.cos(i * 2.2 + seed) * 0.4) * bp.crownSize,
+                (Math.sin(i * 3.7 + seed) * 0.4) * bp.crownSize
+            );
+            apple.material = appleMat;
+        }
+    },
+
+    createVoxelBench: function (parent, bp) {
+        const woodMat = new BABYLON.StandardMaterial("woodMat", this.scene);
+        woodMat.diffuseColor = BABYLON.Color3.FromHexString(bp.woodColor);
+
+        const metalMat = new BABYLON.StandardMaterial("metalMat", this.scene);
+        metalMat.diffuseColor = BABYLON.Color3.FromHexString(bp.metalColor);
+
+        // Seat
+        const seat = BABYLON.MeshBuilder.CreateBox("seat", { width: bp.width, height: 0.1, depth: bp.depth }, this.scene);
+        seat.parent = parent;
+        seat.position.y = 0.5;
+        seat.material = woodMat;
+
+        // Backrest
+        const back = BABYLON.MeshBuilder.CreateBox("back", { width: bp.width, height: 0.5, depth: 0.1 }, this.scene);
+        back.parent = parent;
+        back.position.y = 0.8;
+        back.position.z = bp.depth / 2;
+        back.material = woodMat;
+
+        // Legs (Simplified)
+        const legLeft = BABYLON.MeshBuilder.CreateBox("legL", { width: 0.1, height: 0.5, depth: bp.depth }, this.scene);
+        legLeft.parent = parent;
+        legLeft.position.x = -bp.width / 2 + 0.1;
+        legLeft.position.y = 0.25;
+        legLeft.material = metalMat;
+
+        const legRight = BABYLON.MeshBuilder.CreateBox("legR", { width: 0.1, height: 0.5, depth: bp.depth }, this.scene);
+        legRight.parent = parent;
+        legRight.position.x = bp.width / 2 - 0.1;
+        legRight.position.y = 0.25;
+        legRight.material = metalMat;
+    },
+
+    createVoxelHouse: function (parent, bp) {
+        const wallMat = new BABYLON.StandardMaterial("wallMat", this.scene);
+        wallMat.diffuseColor = BABYLON.Color3.FromHexString(bp.wallColor);
+
+        const trimMat = new BABYLON.StandardMaterial("trimMat", this.scene);
+        trimMat.diffuseColor = BABYLON.Color3.FromHexString(bp.trimColor);
+
+        const roofMat = new BABYLON.StandardMaterial("roofMat", this.scene);
+        roofMat.diffuseColor = BABYLON.Color3.FromHexString(bp.roofColor);
+
+        // Main Structure
+        const wall = BABYLON.MeshBuilder.CreateBox("wall", { width: 3, height: 2.5, depth: 4 }, this.scene);
+        wall.parent = parent;
+        wall.position.y = 1.25;
+        wall.material = wallMat;
+        wall.checkCollisions = true;
+
+        // Roof (Traditional Gable)
+        const roof = BABYLON.MeshBuilder.CreateCylinder("roof", { diameter: 4.5, height: 3.2, tessellation: 3 }, this.scene);
+        roof.parent = parent;
+        roof.position.y = 3;
+        roof.rotation.z = Math.PI / 2;
+        roof.material = roofMat;
+
+        // Door
+        const door = BABYLON.MeshBuilder.CreateBox("door", { width: 0.8, height: 1.4, depth: 0.1 }, this.scene);
+        door.parent = parent;
+        door.position = new BABYLON.Vector3(0, 0.7, -2.01);
+        door.material = trimMat;
+
+        // Window Frames
+        const windowFrame = BABYLON.MeshBuilder.CreateBox("window", { width: 0.8, height: 0.8, depth: 0.1 }, this.scene);
+        windowFrame.parent = parent;
+        windowFrame.position = new BABYLON.Vector3(0.8, 1.8, -2.01);
+        windowFrame.material = trimMat;
     },
 
     createScene: function () {
@@ -95,7 +279,7 @@ window.tsFamilyEngine = {
         const leafMat = new BABYLON.StandardMaterial("leafMat", scene);
         leafMat.diffuseColor = new BABYLON.Color3(0.1, 0.4, 0.2);
 
-        // Houses
+        // Fixed Houses
         const housePositions = [
             { pos: new BABYLON.Vector3(15, 2, 15), mat: houseMat },
             { pos: new BABYLON.Vector3(-15, 2, 15), mat: whiteMat },
@@ -103,28 +287,23 @@ window.tsFamilyEngine = {
             { pos: new BABYLON.Vector3(-15, 2, -15), mat: whiteMat }
         ];
 
-        housePositions.forEach((p, i) => {
-            const box = BABYLON.MeshBuilder.CreateBox("house" + i, { width: 6, height: 4, depth: 8 }, scene);
-            box.position = p.pos;
-            box.material = p.mat;
-            box.checkCollisions = true;
+        housePositions.forEach(hp => {
+            const house = BABYLON.MeshBuilder.CreateBox("house", { width: 4, height: 4, depth: 4 }, scene);
+            house.position = hp.pos;
+            house.material = hp.mat;
+            house.checkCollisions = true;
+
+            const roof = BABYLON.MeshBuilder.CreateCylinder("roof", { diameter: 5, height: 1, tessellation: 3 }, scene);
+            roof.position = hp.pos.clone();
+            roof.position.y += 2.5;
+            roof.rotation.z = Math.PI / 2;
+            roof.material = woodMat;
         });
 
-        // Trees
-        const treePositions = [
-            new BABYLON.Vector3(8, 0, 8),
-            new BABYLON.Vector3(-8, 0, 8),
-            new BABYLON.Vector3(8, 0, -8),
-            new BABYLON.Vector3(-8, 0, -8)
-        ];
-
-        treePositions.forEach((pos, i) => {
-            this.createTree(scene, pos, woodMat, leafMat);
-        });
-
-        // Benches
-        this.createBench(scene, new BABYLON.Vector3(0, 0, 5), woodMat);
-        this.createBench(scene, new BABYLON.Vector3(0, 0, -5), woodMat);
+        // Initial Trees
+        for (let i = 0; i < 6; i++) {
+            this.createTree(scene, new BABYLON.Vector3(Math.random() * 80 - 40, 0, Math.random() * 80 - 40), woodMat, leafMat);
+        }
     },
 
     createTree: function (scene, pos, woodMat, leafMat) {
@@ -138,15 +317,46 @@ window.tsFamilyEngine = {
         leaves.material = leafMat;
     },
 
-    createBench: function (scene, pos, woodMat) {
-        const seat = BABYLON.MeshBuilder.CreateBox("benchSeat", { width: 3, height: 0.2, depth: 1 }, scene);
-        seat.position = pos.add(new BABYLON.Vector3(0, 0.5, 0));
-        seat.material = woodMat;
-        seat.checkCollisions = true;
+    toggleBuildMode: function (enabled, blueprintId = "apple_tree") {
+        this.isBuilding = enabled;
+        this.selectedBlueprintId = blueprintId;
 
-        const back = BABYLON.MeshBuilder.CreateBox("benchBack", { width: 3, height: 0.8, depth: 0.1 }, scene);
-        back.position = pos.add(new BABYLON.Vector3(0, 1, 0.5));
-        back.material = woodMat;
+        if (this.previewNode) {
+            this.previewNode.dispose();
+            this.previewNode = null;
+        }
+
+        if (this.isBuilding) {
+            this.previewNode = new BABYLON.TransformNode("preview", this.scene);
+            this.renderWorldObject({ id: "preview", type: this.selectedBlueprintId, x: 0, y: 0, z: 0 });
+            this.worldObjects["preview"].parent = this.previewNode;
+
+            // Make preview semi-transparent
+            this.previewNode.getChildMeshes().forEach(m => {
+                m.visibility = 0.5;
+                m.isPickable = false;
+            });
+        }
+    },
+
+    updatePlacementPreview: function () {
+        const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => mesh.name === "ground");
+        if (pickInfo.hit && this.previewNode) {
+            this.previewNode.position = pickInfo.pickedPoint;
+        }
+    },
+
+    placeObject: function (point) {
+        if (!window.firebaseManager) return;
+
+        window.firebaseManager.placeWorldObject({
+            type: this.selectedBlueprintId,
+            x: point.x,
+            y: point.y,
+            z: point.z,
+            ry: 0,
+            seed: Math.floor(Math.random() * 1000)
+        });
     },
 
     hasJoined: false,
