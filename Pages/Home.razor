@@ -27,12 +27,14 @@
     private bool HasJoined = false;
     private string CurrentUserName = "";
     private List<ChatMessage> ChatMessages = new();
+    private DotNetObjectReference<Home>? objRef;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await JSRuntime.InvokeVoidAsync("tsFamilyEngine.init", "renderCanvas");
+            objRef = DotNetObjectReference.Create(this);
         }
     }
 
@@ -44,19 +46,26 @@
             HasJoined = true;
             await JSRuntime.InvokeVoidAsync("tsFamilyEngine.spawnUser", name);
             
-            // Mock welcome message
-            ChatMessages.Add(new ChatMessage { User = "System", Message = $"Welcome to Stavanger, {name}!" });
+            // Listen for real Firebase chat messages
+            await JSRuntime.InvokeVoidAsync("tsFamilyEngine.initChat", objRef);
         }
     }
 
-    private void SendMessage(string message)
+    [JSInvokable]
+    public void ReceiveChatMessage(string user, string message)
     {
-        ChatMessages.Add(new ChatMessage { 
-            User = CurrentUserName, 
-            Message = message 
-        });
-        
-        // In a real app, we'd send this to SignalR here
+        ChatMessages.Add(new ChatMessage { User = user, Message = message });
+        StateHasChanged();
+    }
+
+    private async Task SendMessage(string message)
+    {
+        await JSRuntime.InvokeVoidAsync("tsFamilyEngine.sendChat", message);
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
     }
 }
 

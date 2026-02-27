@@ -7,6 +7,14 @@ window.tsFamilyEngine = {
     inputMap: {},
     walkTimer: 0,
     hasJoined: false,
+    userId: localStorage.getItem("tsFamilyUserId") || (function () {
+        const id = Math.random().toString(36).substr(2, 9);
+        localStorage.setItem("tsFamilyUserId", id);
+        return id;
+    })(),
+    userName: "User",
+    ghostPlayers: {},
+    syncTimer: 0,
 
     init: function (canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -28,6 +36,7 @@ window.tsFamilyEngine = {
         this.engine.runRenderLoop(() => {
             if (this.player && this.hasJoined) {
                 this.handleMovement();
+                this.updateSync();
             }
             this.scene.render();
         });
@@ -189,7 +198,9 @@ window.tsFamilyEngine = {
     },
 
     spawnUser: function (name) {
+        this.userName = name;
         this.hasJoined = true;
+        this.setupMultiplayer();
 
         // Root transform for the player
         this.player = BABYLON.MeshBuilder.CreateBox("playerRoot", { size: 0.1 }, this.scene);
@@ -302,5 +313,159 @@ window.tsFamilyEngine = {
         planeMat.backFaceCulling = false;
         plane.material = planeMat;
         plane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+    },
+
+    setupMultiplayer: function () {
+        if (!window.firebaseManager) {
+            console.warn("Firebase Manager not ready yet. Retrying...");
+            setTimeout(() => this.setupMultiplayer(), 500);
+            return;
+        }
+
+        // Listen for other players
+        window.firebaseManager.listenForPlayers((players) => {
+            const now = Date.now();
+            const activePlayers = players.filter(p => {
+                if (!p.lastSeen) return true; // Newly joined
+                const lastUpdated = p.lastSeen.seconds ? p.lastSeen.seconds * 1000 : p.lastSeen;
+                return (now - lastUpdated) < 60000; // 1 minute timeout
+            });
+
+            activePlayers.forEach(p => {
+                if (p.id === this.userId) return; // Skip self
+
+                if (!this.ghostPlayers[p.id]) {
+                    this.spawnGhost(p.id, p.name);
+                }
+
+                const ghost = this.ghostPlayers[p.id];
+                ghost.targetPosition = new BABYLON.Vector3(p.x, p.y, p.z);
+                ghost.targetRotationY = p.ry;
+                ghost.lastUpdate = now;
+            });
+
+            // Cleanup old ghosts
+            const activeIds = activePlayers.map(p => p.id);
+            for (let id in this.ghostPlayers) {
+                if (!activeIds.includes(id)) {
+                    this.ghostPlayers[id].dispose();
+                    delete this.ghostPlayers[id];
+                }
+            }
+        });
+
+        // Interpolation loop for ghosts
+        this.scene.onBeforeRenderObservable.add(() => {
+            for (let id in this.ghostPlayers) {
+                const ghost = this.ghostPlayers[id];
+                if (ghost.targetPosition) {
+                    // Smoothly LERP position and rotation
+                    ghost.position = BABYLON.Vector3.Lerp(ghost.position, ghost.targetPosition, 0.1);
+                    ghost.rotation.y = BABYLON.Scalar.LerpAngle(ghost.rotation.y, ghost.targetRotationY, 0.1);
+                }
+            }
+        });
+    },
+
+    spawnGhost: function (id, name) {
+        console.log("Spawning ghost for: " + name);
+        const ghost = BABYLON.MeshBuilder.CreateBox("ghost_" + id, { size: 0.1 }, this.scene);
+        ghost.position = new BABYLON.Vector3(0, 0, 0);
+        ghost.isVisible = false; // Root is hidden
+
+        // Simple voxel humanoid for ghosts
+        const skinMat = new BABYLON.StandardMaterial("skinMatGhost", this.scene);
+        skinMat.diffuseColor = new BABYLON.Color3(1, 0.8, 0.6);
+
+        const shirtMat = new BABYLON.StandardMaterial("shirtMatGhost", this.scene);
+        shirtMat.diffuseColor = new BABYLON.Color3(0.5, 0.5, 0.5); // Grey shirts for ghosts
+
+        const torso = BABYLON.MeshBuilder.CreateBox("torsoGhost", { width: 0.8, height: 0.8, depth: 0.4 }, this.scene);
+        torso.parent = ghost;
+        torso.position.y = 1.2;
+        torso.material = shirtMat;
+
+        const head = BABYLON.MeshBuilder.CreateBox("headGhost", { size: 0.6 }, this.scene);
+        head.parent = ghost;
+        head.position.y = 1.9;
+        head.material = skinMat;
+
+        // Legs
+        const pantsMat = new BABYLON.StandardMaterial("pantsMatGhost", this.scene);
+        pantsMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        const leftLeg = BABYLON.MeshBuilder.CreateBox("leftLegGhost", { width: 0.35, height: 0.8, depth: 0.35 }, this.scene);
+        leftLeg.parent = ghost;
+        leftLeg.position = new BABYLON.Vector3(-0.2, 0.4, 0);
+        leftLeg.material = pantsMat;
+
+        const rightLeg = BABYLON.MeshBuilder.CreateBox("rightLegGhost", { width: 0.35, height: 0.8, depth: 0.35 }, this.scene);
+        rightLeg.parent = ghost;
+        rightLeg.position = new BABYLON.Vector3(0.2, 0.4, 0);
+        rightLeg.material = pantsMat;
+
+        // Arms
+        const leftArm = BABYLON.MeshBuilder.CreateBox("leftArmGhost", { width: 0.3, height: 0.7, depth: 0.3 }, this.scene);
+        leftArm.parent = ghost;
+        leftArm.position = new BABYLON.Vector3(-0.55, 1.25, 0);
+        leftArm.material = skinMat;
+
+        const rightArm = BABYLON.MeshBuilder.CreateBox("rightArmGhost", { width: 0.3, height: 0.7, depth: 0.3 }, this.scene);
+        rightArm.parent = ghost;
+        rightArm.position = new BABYLON.Vector3(0.55, 1.25, 0);
+        rightArm.material = skinMat;
+
+        // Name tag for ghost
+        const namePlane = BABYLON.MeshBuilder.CreatePlane("namePlaneGhost", { width: 2, height: 1 }, this.scene);
+        namePlane.parent = ghost;
+        namePlane.position.y = 2.6;
+        namePlane.billboardMode = BABYLON.Mesh.BILLBOARDMODE_ALL;
+
+        const nameTexture = new BABYLON.DynamicTexture("nameTextureGhost", { width: 512, height: 128 }, this.scene);
+        nameTexture.hasAlpha = true;
+        nameTexture.drawText(name, null, null, "bold 60px Inter", "white", "transparent", true);
+
+        const nameMaterial = new BABYLON.StandardMaterial("nameMatGhost", this.scene);
+        nameMaterial.diffuseTexture = nameTexture;
+        nameMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
+        nameMaterial.backFaceCulling = false;
+        namePlane.material = nameMaterial;
+
+        this.ghostPlayers[id] = ghost;
+    },
+
+    updateSync: function () {
+        this.syncTimer++;
+        if (this.syncTimer >= 12) { // Every ~12 frames (~200ms)
+            this.syncTimer = 0;
+            if (window.firebaseManager && this.player) {
+                window.firebaseManager.updatePlayerPosition(
+                    this.userId,
+                    this.userName,
+                    this.player.position,
+                    this.player.rotation
+                );
+            }
+        }
+    },
+
+    initChat: function (dotNetRef) {
+        if (!window.firebaseManager) {
+            setTimeout(() => this.initChat(dotNetRef), 500);
+            return;
+        }
+
+        window.firebaseManager.listenForChat((msg) => {
+            // Send back to Blazor
+            if (dotNetRef) {
+                dotNetRef.invokeMethodAsync("ReceiveChatMessage", msg.name, msg.text);
+            }
+        });
+    },
+
+    sendChat: function (message) {
+        if (window.firebaseManager) {
+            window.firebaseManager.sendChatMessage(this.userId, this.userName, message);
+        }
     }
 };
