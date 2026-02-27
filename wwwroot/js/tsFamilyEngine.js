@@ -23,6 +23,9 @@ window.tsFamilyEngine = {
     isBuilding: false,
     selectedBlueprintId: "apple_tree",
     previewNode: null,
+    targetDestination: null,
+    moveMarker: null,
+    lastTapTime: 0,
 
     init: async function (canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -55,12 +58,22 @@ window.tsFamilyEngine = {
             this.scene.render();
         });
 
-        // Pointer Click Handling for Placement
+        // Pointer Click Handling for Placement and Movement
         this.scene.onPointerObservable.add((pointerInfo) => {
-            if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN && this.isBuilding) {
+            if (pointerInfo.type === BABYLON.PointerEventTypes.POINTERDOWN) {
+                const now = Date.now();
                 const pickInfo = this.scene.pick(this.scene.pointerX, this.scene.pointerY, (mesh) => mesh.name === "ground");
+
                 if (pickInfo.hit) {
-                    this.placeObject(pickInfo.pickedPoint);
+                    if (this.isBuilding) {
+                        this.placeObject(pickInfo.pickedPoint);
+                    } else {
+                        // Double Tap Detection (Mobile Movement)
+                        if (now - this.lastTapTime < 300) {
+                            this.setTargetDestination(pickInfo.pickedPoint);
+                        }
+                        this.lastTapTime = now;
+                    }
                 }
             }
         });
@@ -457,11 +470,42 @@ window.tsFamilyEngine = {
         });
     },
 
+    setTargetDestination: function (point) {
+        this.targetDestination = point;
+
+        // Show/Create marker
+        if (!this.moveMarker) {
+            this.moveMarker = BABYLON.MeshBuilder.CreateTorus("moveMarker", { thickness: 0.1, diameter: 0.8 }, this.scene);
+            const mat = new BABYLON.StandardMaterial("moveMarkerMat", this.scene);
+            mat.emissiveColor = new BABYLON.Color3(1, 1, 0); // Yellow glow
+            mat.alpha = 0.5;
+            this.moveMarker.material = mat;
+            this.moveMarker.isPickable = false;
+        }
+
+        this.moveMarker.position = point.add(new BABYLON.Vector3(0, 0.05, 0));
+        this.moveMarker.isVisible = true;
+
+        // Animation for the marker
+        this.moveMarker.scaling.set(1, 1, 1);
+        const anim = new BABYLON.Animation("markerPulse", "scaling", 30, BABYLON.Animation.ANIMATIONTYPE_VECTOR3, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+        anim.setKeys([{ frame: 0, value: new BABYLON.Vector3(1, 1, 1) }, { frame: 15, value: new BABYLON.Vector3(1.2, 1.2, 1.2) }, { frame: 30, value: new BABYLON.Vector3(1, 1, 1) }]);
+        this.moveMarker.animations = [anim];
+        this.scene.beginAnimation(this.moveMarker, 0, 30, true);
+    },
+
     hasJoined: false,
     handleMovement: function () {
         const speed = 0.15;
         const rotateSpeed = 0.04;
         let isMoving = false;
+
+        // Keyboard overrides auto-movement
+        const hasKeyboardInput = this.inputMap["w"] || this.inputMap["s"] || this.inputMap["a"] || this.inputMap["d"];
+        if (hasKeyboardInput) {
+            this.targetDestination = null;
+            if (this.moveMarker) this.moveMarker.isVisible = false;
+        }
 
         if (this.inputMap["w"]) {
             this.player.moveWithCollisions(this.player.forward.scale(speed));
@@ -476,6 +520,34 @@ window.tsFamilyEngine = {
         }
         if (this.inputMap["d"]) {
             this.player.rotation.y += rotateSpeed;
+        }
+
+        // Automated Movement (Point-to-Click)
+        if (this.targetDestination && !hasKeyboardInput) {
+            const dist = BABYLON.Vector2.Distance(
+                new BABYLON.Vector2(this.player.position.x, this.player.position.z),
+                new BABYLON.Vector2(this.targetDestination.x, this.targetDestination.z)
+            );
+
+            if (dist > 0.5) {
+                // Calculate target angle
+                const diff = this.targetDestination.subtract(this.player.position);
+                const targetAngle = Math.atan2(diff.x, diff.z);
+
+                // Rotate smoothly
+                const angleDiff = BABYLON.Scalar.DeltaAngle(this.player.rotation.y, targetAngle);
+                if (Math.abs(angleDiff) > 0.1) {
+                    this.player.rotation.y += Math.sign(angleDiff) * rotateSpeed;
+                } else {
+                    // Move forward if facing correctly
+                    this.player.moveWithCollisions(this.player.forward.scale(speed));
+                    isMoving = true;
+                }
+            } else {
+                // Arrived
+                this.targetDestination = null;
+                if (this.moveMarker) this.moveMarker.isVisible = false;
+            }
         }
 
         // Animate Limbs
