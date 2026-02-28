@@ -662,9 +662,9 @@ window.tsFamilyEngine = {
                 this.player.limbs.torso.rotation.x = 0.15;
             } else if (isScooting) {
                 // Scooter Animation
-                // Hands on handlebars
-                this.player.limbs.leftArm.rotation.x = 1.0;
-                this.player.limbs.rightArm.rotation.x = 1.0;
+                // Hands on handlebars (reaching further forward/up)
+                this.player.limbs.leftArm.rotation.x = -1.3;
+                this.player.limbs.rightArm.rotation.x = -1.3;
                 // Left leg on deck
                 this.player.limbs.leftLeg.rotation.x = 0.1;
                 // Right leg pushes
@@ -893,10 +893,10 @@ window.tsFamilyEngine = {
                                 m.rotation.x = (isSkating || isScooting) ? -swing * 2 : -swing;
                             }
                             if (m.name === "leftArmGhost") {
-                                m.rotation.x = isScooting ? 1.0 : (isSkating ? -0.4 : -swing);
+                                m.rotation.x = isScooting ? -1.3 : (isSkating ? -0.4 : -swing);
                             }
                             if (m.name === "rightArmGhost") {
-                                m.rotation.x = isScooting ? 1.0 : (isSkating ? 0.4 : swing);
+                                m.rotation.x = isScooting ? -1.3 : (isSkating ? 0.4 : swing);
                             }
                         });
                     }
@@ -1080,15 +1080,15 @@ window.tsFamilyEngine = {
         const wheelMat = new BABYLON.StandardMaterial("scooterWheelMat", this.scene);
         wheelMat.diffuseColor = new BABYLON.Color3(0.2, 0.2, 0.2);
 
-        // Deck
-        const deck = BABYLON.MeshBuilder.CreateBox("scooterDeck", { width: 0.4, height: 0.05, depth: 1.0 }, this.scene);
+        // Deck (Increased length)
+        const deck = BABYLON.MeshBuilder.CreateBox("scooterDeck", { width: 0.4, height: 0.05, depth: 1.4 }, this.scene);
         deck.parent = scooterRoot;
         deck.material = deckMat;
 
-        // Steering Column
+        // Steering Column (Move further forward: z = 0.65)
         const pole = BABYLON.MeshBuilder.CreateBox("scooterPole", { width: 0.05, height: 1.4, depth: 0.05 }, this.scene);
         pole.parent = scooterRoot;
-        pole.position.set(0, 0.7, -0.45);
+        pole.position.set(0, 0.7, 0.65);
         pole.material = metalMat;
 
         // Handlebars
@@ -1111,16 +1111,16 @@ window.tsFamilyEngine = {
         gripR.position.x = 0.3;
         gripR.material = gripMat;
 
-        // Wheels
+        // Wheels (Adjusted for longer deck)
         const wheel1 = BABYLON.MeshBuilder.CreateCylinder("scooterWheel1", { diameter: 0.2, height: 0.08 }, this.scene);
         wheel1.parent = scooterRoot;
-        wheel1.position.set(0, -0.05, 0.45);
+        wheel1.position.set(0, -0.05, 0.6);
         wheel1.rotation.z = Math.PI / 2;
         wheel1.material = wheelMat;
 
         const wheel2 = BABYLON.MeshBuilder.CreateCylinder("scooterWheel2", { diameter: 0.2, height: 0.08 }, this.scene);
         wheel2.parent = scooterRoot;
-        wheel2.position.set(0, -0.05, -0.45);
+        wheel2.position.set(0, -0.05, -0.6);
         wheel2.rotation.z = Math.PI / 2;
         wheel2.material = wheelMat;
 
