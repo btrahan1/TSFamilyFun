@@ -17,6 +17,9 @@
                 <button class="build-toggle @(IsRecreationMode ? "recreation-active" : "")" @onclick="ToggleRecreationMode">
                     @(IsRecreationMode ? "🛹 Exit Recreation" : "🛹 Recreation")
                 </button>
+                <button class="build-toggle @(IsPetsMode ? "pets-active" : "")" @onclick="TogglePetsMode">
+                    @(IsPetsMode ? "🐶 Exit Pets" : "🐶 Pets")
+                </button>
                 <button class="build-toggle @(IsBuildMode ? "active" : "")" @onclick="ToggleBuildMode">
                     @(IsBuildMode ? "🔨 Exit Build" : "🔨 Build")
                 </button>
@@ -50,6 +53,22 @@
                         <div class="asset-item @(TransportMode == "skate" ? "selected" : "")" @onclick="@(() => SetTransport("skate"))">🛹 Skateboard</div>
                         <div class="asset-item @(TransportMode == "scooter" ? "selected" : "")" @onclick="@(() => SetTransport("scooter"))">🛴 Scooter</div>
                         <div class="asset-item @(TransportMode == "bike" ? "selected" : "")" @onclick="@(() => SetTransport("bike"))">🚲 Bicycle</div>
+                        <div class="asset-item @(TransportMode == "rc_car" ? "selected" : "")" @onclick="@(() => SetTransport("rc_car"))">🏎️ RC Car</div>
+                        <div class="asset-item @(TransportMode == "rc_drone" ? "selected" : "")" @onclick="@(() => SetTransport("rc_drone"))">🚁 RC Drone</div>
+                    </div>
+                </div>
+            }
+
+            @if (IsPetsMode)
+            {
+                <div class="build-menu glass-panel">
+                    <span class="menu-title">Pets</span>
+                    <div class="asset-list">
+                        <div class="asset-item @(SelectedAsset == "dog" ? "selected" : "")" @onclick="@(() => SelectAsset("dog"))">🐶 Dog</div>
+                        <div class="asset-item @(SelectedAsset == "cat" ? "selected" : "")" @onclick="@(() => SelectAsset("cat"))">🐱 Cat</div>
+                    </div>
+                    <div class="build-tools">
+                        <button class="bulldozer-btn @(IsBulldozerMode ? "active" : "")" @onclick="ToggleBulldozer">🚜 Remove Pet</button>
                     </div>
                 </div>
             }
@@ -67,6 +86,7 @@
     private List<ChatMessage> ChatMessages = new();
     private bool IsBuildMode = false;
     private bool IsRecreationMode = false;
+    private bool IsPetsMode = false;
     private string TransportMode = "walk";
     private bool IsBulldozerMode = false;
     private string SelectedAsset = "apple_tree";
@@ -109,7 +129,11 @@
     private async Task ToggleBuildMode()
     {
         IsBuildMode = !IsBuildMode;
-        if (IsBuildMode) IsRecreationMode = false;
+        if (IsBuildMode) 
+        {
+            IsRecreationMode = false;
+            IsPetsMode = false;
+        }
         await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", IsBuildMode, SelectedAsset);
         if (IsBuildMode) await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBulldozer", false);
     }
@@ -120,6 +144,31 @@
         if (IsRecreationMode) 
         {
             IsBuildMode = false;
+            IsPetsMode = false;
+            await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", false);
+        }
+        else
+        {
+            // If exiting recreation while in RC mode, reset to walk
+            if (TransportMode == "rc_car" || TransportMode == "rc_drone")
+            {
+                await SetTransport("walk");
+            }
+        }
+    }
+
+    private async Task TogglePetsMode()
+    {
+        IsPetsMode = !IsPetsMode;
+        if (IsPetsMode)
+        {
+            IsBuildMode = false;
+            IsRecreationMode = false;
+            SelectedAsset = "dog"; // Default pet
+            await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", true, SelectedAsset);
+        }
+        else
+        {
             await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", false);
         }
     }
@@ -134,7 +183,8 @@
     {
         SelectedAsset = assetId;
         IsBulldozerMode = false;
-        await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", IsBuildMode, SelectedAsset);
+        bool engineBuildMode = IsBuildMode || IsPetsMode;
+        await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBuildMode", engineBuildMode, SelectedAsset);
         await JSRuntime.InvokeVoidAsync("tsFamilyEngine.toggleBulldozer", false);
     }
 
@@ -199,6 +249,11 @@
     .build-toggle.recreation-active {
         background: #2196f3;
         border-color: #2196f3;
+    }
+
+    .build-toggle.pets-active {
+        background: #ff9800;
+        border-color: #ff9800;
     }
 
     .build-menu {

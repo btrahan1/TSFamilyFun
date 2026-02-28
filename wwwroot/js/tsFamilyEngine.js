@@ -18,8 +18,13 @@ window.tsFamilyEngine = {
     lastSyncedPos: null,
     lastSyncedRot: null,
     lastHeartbeat: 0,
+    transportMode: "walk", // walk, skate, scooter, bike
+    isRCMode: false,
+    activeRC: null,
+    droneRotors: [],
     blueprints: {},
     worldObjects: {},
+    worldPets: {},
     isBuilding: false,
     selectedBlueprintId: "apple_tree",
     previewNode: null,
@@ -27,11 +32,14 @@ window.tsFamilyEngine = {
     moveMarker: null,
     lastTapTime: 0,
     isBulldozing: false,
-    transportMode: "walk", // walk, skate, scooter, bike
 
     init: async function (canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.engine = new BABYLON.Engine(this.canvas, true);
+
+        this.worldObjects = {};
+        this.blueprints = {};
+        this.worldPets = {};
 
         await this.loadAssets();
 
@@ -61,6 +69,72 @@ window.tsFamilyEngine = {
             if (this.isBuilding) {
                 this.updatePlacementPreview();
             }
+
+            // Pet Simulation Loop
+            const now = Date.now();
+            for (let id in this.worldPets) {
+                const pet = this.worldPets[id];
+                if (pet.isDisposed()) {
+                    delete this.worldPets[id];
+                    continue;
+                }
+                const data = pet.petData;
+                const isPreview = (id === "preview");
+
+                if (!data.isMoving && !isPreview) {
+                    data.moveTimer -= 1;
+                    if (data.moveTimer <= 0) {
+                        // Pick random destination within 5 units
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = 3 + Math.random() * 5;
+                        data.targetPos = pet.position.add(new BABYLON.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist));
+
+                        // Keep within bounds (approximate)
+                        data.targetPos.x = Math.max(-45, Math.min(45, data.targetPos.x));
+                        data.targetPos.z = Math.max(-45, Math.min(45, data.targetPos.z));
+
+                        data.isMoving = true;
+                    }
+                } else if (!isPreview) {
+                    const distSq = BABYLON.Vector3.DistanceSquared(
+                        new BABYLON.Vector3(pet.position.x, 0, pet.position.z),
+                        new BABYLON.Vector3(data.targetPos.x, 0, data.targetPos.z)
+                    );
+
+                    if (distSq > 0.04) { // 0.2 units
+                        const diff = data.targetPos.subtract(pet.position);
+                        const targetAngle = Math.atan2(diff.x, diff.z);
+                        pet.rotation.y = BABYLON.Scalar.LerpAngle(pet.rotation.y, targetAngle, 0.1);
+
+                        pet.position.addInPlace(pet.forward.scale(data.speed));
+                    } else {
+                        data.isMoving = false;
+                        data.moveTimer = 100 + Math.random() * 200;
+                    }
+                }
+
+                // Animation loop runs for all, including preview
+                const hop = Math.abs(Math.sin(now * 0.01)) * 0.1;
+                pet.getChildMeshes().forEach(m => {
+                    if (m.name.includes("Body") || m.name.includes("Head") || m.name.includes("Tail")) {
+                        // Use base Y offset + hopping
+                        let baseY = m.name.includes("Body") ? 0.3 : (m.name.includes("Head") ? 0.2 : 0.1);
+                        if (pet.blueprintId === "cat") baseY = m.name.includes("Body") ? 0.25 : (m.name.includes("Head") ? 0.15 : 0.15);
+                        m.position.y = baseY + hop;
+                    }
+                });
+            }
+
+            // Drone Rotors
+            if (this.isRCMode && this.transportMode === "rc_drone" && this.droneRotors) {
+                this.droneRotors.forEach((r, i) => {
+                    // Quadcopters have diagonal rotors spinning same direction, adjacent opposite
+                    // Let's just alternate for visual flair
+                    const speed = (i === 1 || i === 2) ? -0.5 : 0.5;
+                    r.rotation.y += speed;
+                });
+            }
+
             this.scene.render();
         });
 
@@ -134,6 +208,9 @@ window.tsFamilyEngine = {
                     this.worldObjects[obj.id].dispose();
                     delete this.worldObjects[obj.id];
                 }
+                if (this.worldPets[obj.id]) {
+                    delete this.worldPets[obj.id];
+                }
             }
         });
     },
@@ -154,6 +231,10 @@ window.tsFamilyEngine = {
             this.createVoxelHouse(container, bp, obj.id);
         } else if (obj.type === "street_light") {
             this.createVoxelStreetLight(container, bp, obj.id);
+        } else if (obj.type === "dog") {
+            this.createVoxelDog(container, bp, obj.id);
+        } else if (obj.type === "cat") {
+            this.createVoxelCat(container, bp, obj.id);
         } else if (bp.recipe) {
             this.createVoxelRecipe(container, bp, obj.id);
         } else {
@@ -166,6 +247,17 @@ window.tsFamilyEngine = {
 
         this.worldObjects[obj.id] = container;
         container.blueprintId = obj.type; // For identification
+
+        // Add to pet simulation if it's a pet
+        if (obj.type === "dog" || obj.type === "cat") {
+            container.petData = {
+                targetPos: container.position.clone(),
+                moveTimer: Math.random() * 100,
+                isMoving: false,
+                speed: 0.05
+            };
+            this.worldPets[obj.id] = container;
+        }
     },
 
     createVoxelTree: function (parent, bp, seed, objId) {
@@ -517,21 +609,32 @@ window.tsFamilyEngine = {
         if (enabled) this.isBulldozing = false; // Mutually exclusive
         this.selectedBlueprintId = blueprintId;
 
+        // Cleanup existing preview
         if (this.previewNode) {
             this.previewNode.dispose();
             this.previewNode = null;
+        }
+        if (this.worldObjects["preview"]) {
+            this.worldObjects["preview"].dispose();
+            delete this.worldObjects["preview"];
+        }
+        if (this.worldPets["preview"]) {
+            delete this.worldPets["preview"];
         }
 
         if (this.isBuilding) {
             this.previewNode = new BABYLON.TransformNode("preview", this.scene);
             this.renderWorldObject({ id: "preview", type: this.selectedBlueprintId, x: 0, y: 0, z: 0 });
-            this.worldObjects["preview"].parent = this.previewNode;
 
-            // Make preview semi-transparent
-            this.previewNode.getChildMeshes().forEach(m => {
-                m.visibility = 0.5;
-                m.isPickable = false;
-            });
+            if (this.worldObjects["preview"]) {
+                this.worldObjects["preview"].parent = this.previewNode;
+
+                // Make preview semi-transparent
+                this.previewNode.getChildMeshes().forEach(m => {
+                    m.visibility = 0.5;
+                    m.isPickable = false;
+                });
+            }
         }
     },
 
@@ -592,6 +695,11 @@ window.tsFamilyEngine = {
 
     hasJoined: false,
     handleMovement: function () {
+        if (this.isRCMode && this.activeRC) {
+            this.handleRCMovement();
+            return;
+        }
+
         const isSkating = this.transportMode === "skate";
         const isScooting = this.transportMode === "scooter";
         const isCycling = this.transportMode === "bike";
@@ -715,6 +823,88 @@ window.tsFamilyEngine = {
 
         // Update camera target to follow player
         this.camera.target = this.player.position;
+    },
+
+    handleRCMovement: function () {
+        if (!this.activeRC) return;
+
+        const isDrone = this.transportMode === "rc_drone";
+        const speed = isDrone ? 0.2 : 0.25;
+        const rotateSpeed = 0.05;
+
+        // Forward/Backward
+        if (this.inputMap["w"]) {
+            this.activeRC.position.addInPlace(this.activeRC.forward.scale(speed));
+        }
+        if (this.inputMap["s"]) {
+            this.activeRC.position.addInPlace(this.activeRC.forward.scale(-speed));
+        }
+
+        // Rotation
+        if (this.inputMap["a"]) {
+            this.activeRC.rotation.y -= rotateSpeed;
+        }
+        if (this.inputMap["d"]) {
+            this.activeRC.rotation.y += rotateSpeed;
+        }
+
+        // Drone Vertical Movement
+        if (isDrone) {
+            if (this.inputMap[" "]) { // Space for Up
+                this.activeRC.position.y += 0.1;
+            }
+            if (this.inputMap["shift"]) { // Shift for Down
+                this.activeRC.position.y -= 0.1;
+                if (this.activeRC.position.y < 0.1) this.activeRC.position.y = 0.1;
+            }
+        } else {
+            // Car Grounding
+            this.activeRC.position.y = 0.1;
+        }
+    },
+
+    handleRCMovement: function () {
+        if (!this.activeRC) return;
+
+        const isDrone = this.transportMode === "rc_drone";
+        const speed = isDrone ? 0.2 : 0.25;
+        const rotateSpeed = 0.05;
+
+        // Forward/Backward
+        if (this.inputMap["w"]) {
+            this.activeRC.position.addInPlace(this.activeRC.forward.scale(speed));
+        }
+        if (this.inputMap["s"]) {
+            this.activeRC.position.addInPlace(this.activeRC.forward.scale(-speed));
+        }
+
+        // Rotation
+        if (this.inputMap["a"]) {
+            this.activeRC.rotation.y -= rotateSpeed;
+        }
+        if (this.inputMap["d"]) {
+            this.activeRC.rotation.y += rotateSpeed;
+        }
+
+        // Drone Vertical Movement
+        if (isDrone) {
+            if (this.inputMap[" "]) { // Space for Up
+                this.activeRC.position.y += 0.1;
+            }
+            if (this.inputMap["shift"]) { // Shift for Down
+                this.activeRC.position.y -= 0.1;
+                if (this.activeRC.position.y < 0.1) this.activeRC.position.y = 0.1;
+            }
+        } else {
+            // Car Grounding
+            this.activeRC.position.y = 0.1;
+        }
+
+        // Sync RC position to Firebase (as a virtual property on the player for simplicity, or a separate collection?)
+        // Let's reuse the player sync for now by adding rcPos/rcRot to the player data.
+        if (window.firebaseManager && this.hasJoined) {
+            window.firebaseManager.updatePlayerRC(this.userId, this.activeRC.position, this.activeRC.rotation.y, this.transportMode);
+        }
     },
 
     spawnUser: function (name) {
@@ -891,6 +1081,16 @@ window.tsFamilyEngine = {
                 ghost.targetPosition = new BABYLON.Vector3(p.x, p.y, p.z);
                 ghost.targetRotationY = p.ry;
                 ghost.targetTransportMode = p.transportMode || "walk";
+
+                // RC Data
+                ghost.targetRCMode = p.rcMode || "walk";
+                if (p.rcX !== undefined && p.rcX !== null) {
+                    ghost.targetRCPosition = new BABYLON.Vector3(p.rcX, p.rcY, p.rcZ);
+                    ghost.targetRCRotationY = p.rcRy;
+                } else {
+                    ghost.targetRCPosition = null;
+                }
+
                 ghost.lastUpdate = now;
             });
 
@@ -925,6 +1125,28 @@ window.tsFamilyEngine = {
                     }
                     if (ghost.bicycle) {
                         ghost.bicycle.setEnabled(ghost.targetTransportMode === "bike");
+                    }
+                    if (ghost.rcCar) {
+                        const isRC = ghost.targetRCMode === "rc_car";
+                        ghost.rcCar.setEnabled(isRC);
+                        if (isRC && ghost.targetRCPosition) {
+                            ghost.rcCar.position = BABYLON.Vector3.Lerp(ghost.rcCar.position, ghost.targetRCPosition, 0.1);
+                            ghost.rcCar.rotation.y = BABYLON.Scalar.LerpAngle(ghost.rcCar.rotation.y, ghost.targetRCRotationY, 0.1);
+                        }
+                    }
+                    if (ghost.rcDrone) {
+                        const isRC = ghost.targetRCMode === "rc_drone";
+                        ghost.rcDroneNode.setEnabled(isRC);
+                        if (isRC && ghost.targetRCPosition) {
+                            ghost.rcDroneNode.position = BABYLON.Vector3.Lerp(ghost.rcDroneNode.position, ghost.targetRCPosition, 0.1);
+                            ghost.rcDroneNode.rotation.y = BABYLON.Scalar.LerpAngle(ghost.rcDroneNode.rotation.y, ghost.targetRCRotationY, 0.1);
+                            if (ghost.rcDroneNode.droneRotors) {
+                                ghost.rcDroneNode.droneRotors.forEach((r, i) => {
+                                    const speed = (i === 1 || i === 2) ? -0.5 : 0.5;
+                                    r.rotation.y += speed;
+                                });
+                            }
+                        }
                     }
 
                     // Simple Ghost Animation
@@ -1037,7 +1259,15 @@ window.tsFamilyEngine = {
         // Ghost Skateboard, Scooter, & Bicycle
         ghost.skateboard = this.createSkateboard(ghost);
         ghost.scooter = this.createScooter(ghost);
-        ghost.bicycle = this.createBicycle(ghost);
+        ghost.bicycle = this.createVoxelBicycle(ghost, true);
+
+        // Recreation models (not parented to ghost root so they can move independently)
+        ghost.rcCar = this.createRCCar(null, true);
+        ghost.rcCar.setEnabled(false);
+
+        ghost.rcDroneNode = new BABYLON.TransformNode("ghostDroneNode_" + id, this.scene);
+        ghost.rcDrone = this.createRCDrone(ghost.rcDroneNode, true);
+        ghost.rcDroneNode.setEnabled(false);
 
         this.ghostPlayers[id] = ghost;
     },
@@ -1277,13 +1507,280 @@ window.tsFamilyEngine = {
     },
 
     setTransportMode: function (mode) {
+        // Cleanup existing RC if switching
+        if (this.isRCMode && (mode !== "rc_car" && mode !== "rc_drone")) {
+            this.toggleRCMode(false);
+        }
+
         this.transportMode = mode;
         this.setTransportVisibility(mode);
+
+        if (mode === "rc_car" || mode === "rc_drone") {
+            this.toggleRCMode(true, mode);
+        }
+    },
+
+    toggleRCMode: function (enabled, mode) {
+        this.isRCMode = enabled;
+        if (enabled) {
+            if (!this.player) return;
+            if (this.activeRC) this.activeRC.dispose();
+
+            this.activeRC = new BABYLON.TransformNode("activeRC", this.scene);
+            this.activeRC.position = this.player.position.clone();
+            this.activeRC.position.y = (mode === "rc_drone" ? 1.5 : 0.1);
+
+            if (mode === "rc_car") this.createRCCar(this.activeRC);
+            else this.createRCDrone(this.activeRC);
+
+            this.setupChaseCamera(this.activeRC);
+        } else {
+            if (this.activeRC) {
+                this.activeRC.dispose();
+                this.activeRC = null;
+            }
+            this.droneRotors = []; // Clear rotors
+            if (window.firebaseManager && this.hasJoined) {
+                window.firebaseManager.updatePlayerRC(this.userId, null, null, "walk"); // Signals despawn
+            }
+            this.resetCamera();
+        }
+    },
+
+
+    setupChaseCamera: function (target) {
+        if (!this.camera) return;
+        this.camera.lockedTarget = target;
+        this.camera.radius = 5;
+        this.camera.alpha = Math.PI / 2;
+        this.camera.beta = Math.PI / 3;
+    },
+
+    resetCamera: function () {
+        if (!this.camera) return;
+        this.camera.lockedTarget = this.player;
+        this.camera.radius = 15;
+        this.camera.alpha = 4.2;
+        this.camera.beta = 1.1;
+    },
+
+    createRCCar: function (parent, isGhost = false) {
+        const idSuffix = isGhost ? "Ghost" : "";
+        const bodyMat = new BABYLON.StandardMaterial("rcCarMat" + idSuffix, this.scene);
+        bodyMat.diffuseColor = isGhost ? new BABYLON.Color3(0.5, 0.5, 0.5) : new BABYLON.Color3(1, 0.1, 0.1);
+
+        const glassMat = new BABYLON.StandardMaterial("rcGlassMat" + idSuffix, this.scene);
+        glassMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.2);
+        glassMat.alpha = 0.8;
+
+        const tireMat = new BABYLON.StandardMaterial("rcTireMat" + idSuffix, this.scene);
+        tireMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        // Chassis
+        const body = BABYLON.MeshBuilder.CreateBox("rcBody" + idSuffix, { width: 0.4, height: 0.15, depth: 0.7 }, this.scene);
+        body.parent = parent;
+        body.position.y = 0.1;
+        body.material = bodyMat;
+
+        const cabin = BABYLON.MeshBuilder.CreateBox("rcCabin" + idSuffix, { width: 0.3, height: 0.15, depth: 0.3 }, this.scene);
+        cabin.parent = body;
+        cabin.position.y = 0.15;
+        cabin.position.z = -0.1;
+        cabin.material = glassMat;
+
+        // Wheels
+        [[-0.2, 0, 0.2], [0.2, 0, 0.2], [-0.2, 0, -0.2], [0.2, 0, -0.2]].forEach((pos, i) => {
+            const wheel = BABYLON.MeshBuilder.CreateCylinder("rcWheel" + idSuffix + i, { diameter: 0.2, height: 0.08 }, this.scene);
+            wheel.parent = body;
+            wheel.position.set(pos[0], -0.05, pos[2]);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.material = tireMat;
+        });
+        return body;
+    },
+
+    createRCDrone: function (parent, isGhost = false) {
+        const idSuffix = isGhost ? "Ghost" : "";
+        const bodyMat = new BABYLON.StandardMaterial("droneMat" + idSuffix, this.scene);
+        bodyMat.diffuseColor = isGhost ? new BABYLON.Color3(0.3, 0.3, 0.3) : new BABYLON.Color3(0.2, 0.2, 0.2);
+
+        const neonMat = new BABYLON.StandardMaterial("droneNeon" + idSuffix, this.scene);
+        neonMat.emissiveColor = isGhost ? new BABYLON.Color3(0.5, 0.5, 0.5) : new BABYLON.Color3(0, 1, 0);
+
+        // Body
+        const body = BABYLON.MeshBuilder.CreateBox("droneBody" + idSuffix, { width: 0.2, height: 0.1, depth: 0.2 }, this.scene);
+        body.parent = parent;
+        body.material = bodyMat;
+
+        // Arms
+        const rotors = [];
+        const offsets = [
+            { x: -0.15, z: 0.15, rot: 3 * Math.PI / 4 }, // Top Left
+            { x: 0.15, z: 0.15, rot: Math.PI / 4 },      // Top Right
+            { x: -0.15, z: -0.15, rot: 5 * Math.PI / 4 }, // Bottom Left
+            { x: 0.15, z: -0.15, rot: 7 * Math.PI / 4 }   // Bottom Right
+        ];
+
+        offsets.forEach((o, i) => {
+            const arm = BABYLON.MeshBuilder.CreateBox("droneArm" + idSuffix + i, { width: 0.3, height: 0.03, depth: 0.03 }, this.scene);
+            arm.parent = body;
+            arm.rotation.y = o.rot;
+            // Position arm so it starts at body edge
+            arm.position.x = o.x / 2;
+            arm.position.z = o.z / 2;
+            arm.material = bodyMat;
+
+            const rotor = BABYLON.MeshBuilder.CreateBox("rotor" + idSuffix + i, { width: 0.3, height: 0.01, depth: 0.03 }, this.scene);
+            rotor.parent = arm;
+            rotor.position.x = 0.15; // Move to tip of arm
+            rotor.position.y = 0.03;
+            rotor.material = neonMat;
+            rotors.push(rotor);
+
+            // Landing Legs
+            const leg = BABYLON.MeshBuilder.CreateBox("droneLeg" + idSuffix + i, { width: 0.03, height: 0.1, depth: 0.03 }, this.scene);
+            leg.parent = arm;
+            leg.position.x = 0.15;
+            leg.position.y = -0.05;
+            leg.material = bodyMat;
+        });
+
+        if (!isGhost) {
+            this.droneRotors = rotors;
+        } else {
+            parent.droneRotors = rotors;
+        }
+        return body;
     },
 
     scrollToBottom: function (element) {
         if (element) {
             element.scrollTop = element.scrollHeight;
         }
+    },
+
+    createVoxelDog: function (parent, bp, objId) {
+        const bodyMat = new BABYLON.StandardMaterial("dogBodyMat", this.scene);
+        bodyMat.diffuseColor = BABYLON.Color3.FromHexString(bp.bodyColor || "#8D6E63");
+
+        const earMat = new BABYLON.StandardMaterial("dogEarMat", this.scene);
+        earMat.diffuseColor = BABYLON.Color3.FromHexString(bp.earColor || "#5D4037");
+
+        // Body
+        const body = BABYLON.MeshBuilder.CreateBox("object_" + objId + "_Body", { width: 0.3, height: 0.3, depth: 0.6 }, this.scene);
+        body.parent = parent;
+        body.position.y = 0.3;
+        body.material = bodyMat;
+        body.isPickable = true;
+
+        // Head
+        const head = BABYLON.MeshBuilder.CreateBox("object_" + objId + "_Head", { size: 0.25 }, this.scene);
+        head.parent = body;
+        head.position.set(0, 0.2, 0.3);
+        head.material = bodyMat;
+
+        // Snout
+        const snout = BABYLON.MeshBuilder.CreateBox("dogSnout", { width: 0.15, height: 0.12, depth: 0.15 }, this.scene);
+        snout.parent = head;
+        snout.position.set(0, -0.05, 0.15);
+        snout.material = bodyMat;
+
+        // Ears
+        const earL = BABYLON.MeshBuilder.CreateBox("dogEarL", { width: 0.05, height: 0.15, depth: 0.1 }, this.scene);
+        earL.parent = head;
+        earL.position.set(-0.1, 0.1, 0);
+        earL.material = earMat;
+
+        const earR = BABYLON.MeshBuilder.CreateBox("dogEarR", { width: 0.05, height: 0.15, depth: 0.1 }, this.scene);
+        earR.parent = head;
+        earR.position.set(0.1, 0.1, 0);
+        earR.material = earMat;
+
+        // Legs
+        const legSize = { width: 0.08, height: 0.2, depth: 0.08 };
+        const legPos = [
+            { x: -0.1, z: 0.2 }, { x: 0.1, z: 0.2 },
+            { x: -0.1, z: -0.2 }, { x: 0.1, z: -0.2 }
+        ];
+        legPos.forEach((p, i) => {
+            const leg = BABYLON.MeshBuilder.CreateBox("dogLeg" + i, legSize, this.scene);
+            leg.parent = body;
+            leg.position.set(p.x, -0.15, p.z);
+            leg.material = bodyMat;
+        });
+
+        // Tail
+        const tail = BABYLON.MeshBuilder.CreateBox("object_" + objId + "_Tail", { width: 0.05, height: 0.05, depth: 0.2 }, this.scene);
+        tail.parent = body;
+        tail.position.set(0, 0.1, -0.35);
+        tail.rotation.x = 0.5;
+        tail.material = bodyMat;
+
+        return body;
+    },
+
+    createVoxelCat: function (parent, bp, objId) {
+        const bodyMat = new BABYLON.StandardMaterial("catBodyMat", this.scene);
+        bodyMat.diffuseColor = BABYLON.Color3.FromHexString(bp.bodyColor || "#9E9E9E");
+
+        const eyeMat = new BABYLON.StandardMaterial("catEyeMat", this.scene);
+        eyeMat.diffuseColor = BABYLON.Color3.FromHexString(bp.eyeColor || "#76FF03");
+
+        // Body
+        const body = BABYLON.MeshBuilder.CreateBox("object_" + objId + "_Body", { width: 0.25, height: 0.25, depth: 0.5 }, this.scene);
+        body.parent = parent;
+        body.position.y = 0.25;
+        body.material = bodyMat;
+        body.isPickable = true;
+
+        // Head
+        const head = BABYLON.MeshBuilder.CreateBox("object_" + objId + "_Head", { size: 0.22 }, this.scene);
+        head.parent = body;
+        head.position.set(0, 0.15, 0.25);
+        head.material = bodyMat;
+
+        // Ears
+        const earL = BABYLON.MeshBuilder.CreateBox("catEarL", { width: 0.08, height: 0.08, depth: 0.05 }, this.scene);
+        earL.parent = head;
+        earL.position.set(-0.07, 0.12, 0);
+        earL.material = bodyMat;
+
+        const earR = BABYLON.MeshBuilder.CreateBox("catEarR", { width: 0.08, height: 0.08, depth: 0.05 }, this.scene);
+        earR.parent = head;
+        earR.position.set(0.07, 0.12, 0);
+        earR.material = bodyMat;
+
+        // Eyes
+        const eyeL = BABYLON.MeshBuilder.CreateBox("catEyeL", { width: 0.05, height: 0.05, depth: 0.02 }, this.scene);
+        eyeL.parent = head;
+        eyeL.position.set(-0.06, 0.05, 0.11);
+        eyeL.material = eyeMat;
+
+        const eyeR = BABYLON.MeshBuilder.CreateBox("catEyeR", { width: 0.05, height: 0.05, depth: 0.02 }, this.scene);
+        eyeR.parent = head;
+        eyeR.position.set(0.06, 0.05, 0.11);
+        eyeR.material = eyeMat;
+
+        // Legs
+        const legSize = { width: 0.07, height: 0.15, depth: 0.07 };
+        const legPos = [
+            { x: -0.08, z: 0.18 }, { x: 0.08, z: 0.18 },
+            { x: -0.08, z: -0.18 }, { x: 0.08, z: -0.18 }
+        ];
+        legPos.forEach((p, i) => {
+            const leg = BABYLON.MeshBuilder.CreateBox("catLeg" + i, legSize, this.scene);
+            leg.parent = body;
+            leg.position.set(p.x, -0.12, p.z);
+            leg.material = bodyMat;
+        });
+
+        // Tail (curved up)
+        const tail = BABYLON.MeshBuilder.CreateBox("object_" + objId + "_Tail", { width: 0.04, height: 0.3, depth: 0.04 }, this.scene);
+        tail.parent = body;
+        tail.position.set(0, 0.15, -0.25);
+        tail.rotation.x = -0.3;
+        tail.material = bodyMat;
+
+        return body;
     }
 };

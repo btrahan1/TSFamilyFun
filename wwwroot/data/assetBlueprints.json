@@ -52,6 +52,20 @@
             "category": "furniture",
             "poleColor": "#424242",
             "bulbColor": "#FFF176"
+        },
+        {
+            "id": "dog",
+            "name": "Dog",
+            "category": "pet",
+            "bodyColor": "#8D6E63",
+            "earColor": "#5D4037"
+        },
+        {
+            "id": "cat",
+            "name": "Cat",
+            "category": "pet",
+            "bodyColor": "#9E9E9E",
+            "eyeColor": "#76FF03"
         }
     ]
 }

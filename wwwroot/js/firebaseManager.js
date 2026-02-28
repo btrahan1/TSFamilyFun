@@ -33,6 +33,30 @@ window.firebaseManager = {
         }, { merge: true });
     },
 
+    updatePlayerRC: async function (userId, position, rotation, mode) {
+        if (!userId) return;
+        const playerDoc = doc(this.playersRef, userId);
+        if (position) {
+            await setDoc(playerDoc, {
+                rcX: position.x,
+                rcY: position.y,
+                rcZ: position.z,
+                rcRy: rotation.y || rotation,
+                rcMode: mode,
+                lastSeen: serverTimestamp()
+            }, { merge: true });
+        } else {
+            // Despawn/Clear RC
+            await setDoc(playerDoc, {
+                rcMode: "walk", // Clear RC mode
+                rcX: null,
+                rcY: null,
+                rcZ: null,
+                rcRy: null
+            }, { merge: true });
+        }
+    },
+
     // Listen for other players
     listenForPlayers: function (callback) {
         const q = query(this.playersRef);
