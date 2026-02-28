@@ -27,7 +27,7 @@ window.tsFamilyEngine = {
     moveMarker: null,
     lastTapTime: 0,
     isBulldozing: false,
-    transportMode: "walk", // walk, skate, scooter
+    transportMode: "walk", // walk, skate, scooter, bike
 
     init: async function (canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -594,7 +594,8 @@ window.tsFamilyEngine = {
     handleMovement: function () {
         const isSkating = this.transportMode === "skate";
         const isScooting = this.transportMode === "scooter";
-        const speed = isScooting ? 0.28 : (isSkating ? 0.25 : 0.15);
+        const isCycling = this.transportMode === "bike";
+        const speed = isCycling ? 0.3 : (isScooting ? 0.28 : (isSkating ? 0.25 : 0.15));
         const rotateSpeed = 0.04;
         let isMoving = false;
 
@@ -650,42 +651,61 @@ window.tsFamilyEngine = {
 
         // Animate Limbs
         if (isMoving) {
-            this.walkTimer += (isSkating || isScooting) ? 0.08 : 0.125;
+            this.walkTimer += (isSkating || isScooting || isCycling) ? 0.08 : 0.125;
             const swing = Math.sin(this.walkTimer) * 0.25;
 
-            if (isSkating) {
+            if (isCycling) {
+                // Bicycle Animation (Pedaling)
+                const pedalSwing = this.walkTimer * 1.25;
+                const leftCycle = Math.sin(pedalSwing);
+                const rightCycle = Math.sin(pedalSwing + Math.PI);
+
+                this.player.limbs.torso.position.y = 1.0 + Math.cos(this.walkTimer * 5) * 0.02;
+                this.player.limbs.torso.rotation.x = 0.2;
+                this.player.limbs.leftArm.rotation.x = -1.2;
+                this.player.limbs.rightArm.rotation.x = -1.2;
+                this.player.limbs.leftUpperLeg.rotation.x = -0.8 + leftCycle * 0.4;
+                this.player.limbs.rightUpperLeg.rotation.x = -0.8 + rightCycle * 0.4;
+                this.player.limbs.leftLowerLeg.rotation.x = 1.5;
+                this.player.limbs.rightLowerLeg.rotation.x = 1.5;
+            } else if (isSkating) {
                 // Skateboard Animation (Pushing)
-                this.player.limbs.leftLeg.rotation.x = 0.2;
-                this.player.limbs.rightLeg.rotation.x = -swing * 2;
+                this.player.limbs.leftUpperLeg.rotation.x = 0.2;
+                this.player.limbs.leftLowerLeg.rotation.x = 0.1;
+                this.player.limbs.rightUpperLeg.rotation.x = -swing * 2;
+                this.player.limbs.rightLowerLeg.rotation.x = swing > 0 ? swing : 0;
                 this.player.limbs.leftArm.rotation.x = -0.4;
                 this.player.limbs.rightArm.rotation.x = 0.4;
                 this.player.limbs.torso.rotation.x = 0.15;
+                this.player.limbs.torso.position.y = 1.2 + Math.abs(swing) * 0.05;
             } else if (isScooting) {
                 // Scooter Animation
-                // Hands on handlebars (reaching further forward/up)
                 this.player.limbs.leftArm.rotation.x = -1.3;
                 this.player.limbs.rightArm.rotation.x = -1.3;
-                // Left leg on deck
-                this.player.limbs.leftLeg.rotation.x = 0.1;
-                // Right leg pushes
-                this.player.limbs.rightLeg.rotation.x = -swing * 2.2;
+                this.player.limbs.leftUpperLeg.rotation.x = 0.1;
+                this.player.limbs.leftLowerLeg.rotation.x = 0.05;
+                this.player.limbs.rightUpperLeg.rotation.x = -swing * 2.2;
+                this.player.limbs.rightLowerLeg.rotation.x = swing > 0 ? swing : 0;
                 this.player.limbs.torso.rotation.x = 0.1;
+                this.player.limbs.torso.position.y = 1.2 + Math.abs(swing) * 0.05;
             } else {
                 // Walking Animation
-                this.player.limbs.leftLeg.rotation.x = swing;
-                this.player.limbs.rightLeg.rotation.x = -swing;
+                this.player.limbs.leftUpperLeg.rotation.x = swing;
+                this.player.limbs.leftLowerLeg.rotation.x = swing < 0 ? -swing : 0;
+                this.player.limbs.rightUpperLeg.rotation.x = -swing;
+                this.player.limbs.rightLowerLeg.rotation.x = swing > 0 ? swing : 0;
                 this.player.limbs.leftArm.rotation.x = -swing;
                 this.player.limbs.rightArm.rotation.x = swing;
                 this.player.limbs.torso.rotation.x = 0;
+                this.player.limbs.torso.position.y = 1.2 + Math.abs(swing) * 0.05;
             }
-
-            // Slight body bob
-            this.player.limbs.torso.position.y = 1.2 + Math.abs(swing) * 0.05;
         } else {
-            // Smoothly return to neutral position
+            // Idle: Smoothly return to neutral position
             const lerpSpeed = 0.1;
-            this.player.limbs.leftLeg.rotation.x *= (1 - lerpSpeed);
-            this.player.limbs.rightLeg.rotation.x *= (1 - lerpSpeed);
+            this.player.limbs.leftUpperLeg.rotation.x *= (1 - lerpSpeed);
+            this.player.limbs.leftLowerLeg.rotation.x *= (1 - lerpSpeed);
+            this.player.limbs.rightUpperLeg.rotation.x *= (1 - lerpSpeed);
+            this.player.limbs.rightLowerLeg.rotation.x *= (1 - lerpSpeed);
             this.player.limbs.leftArm.rotation.x *= (1 - lerpSpeed);
             this.player.limbs.rightArm.rotation.x *= (1 - lerpSpeed);
             this.player.limbs.torso.rotation.x *= (1 - lerpSpeed);
@@ -775,31 +795,55 @@ window.tsFamilyEngine = {
         rightArm.position.y = -0.4;
         rightArm.material = skinMat;
 
-        // Legs (with pivots at hips)
-        const leftLegPivot = new BABYLON.TransformNode("leftLegPivot", this.scene);
-        leftLegPivot.parent = this.player;
-        leftLegPivot.position.set(-0.22, 0.8, 0);
-        this.player.limbs.leftLeg = leftLegPivot;
+        // Legs (with pivots at hips and knees)
+        // Left Leg
+        const leftUpperLegPivot = new BABYLON.TransformNode("leftUpperLegPivot", this.scene);
+        leftUpperLegPivot.parent = this.player;
+        leftUpperLegPivot.position.set(-0.22, 0.8, 0);
+        this.player.limbs.leftUpperLeg = leftUpperLegPivot;
 
-        const leftLeg = BABYLON.MeshBuilder.CreateBox("leftLeg", { width: 0.35, height: 0.8, depth: 0.35 }, this.scene);
-        leftLeg.parent = leftLegPivot;
-        leftLeg.position.y = -0.4;
-        leftLeg.material = pantsMat;
+        const leftUpperLeg = BABYLON.MeshBuilder.CreateBox("leftUpperLeg", { width: 0.35, height: 0.45, depth: 0.35 }, this.scene);
+        leftUpperLeg.parent = leftUpperLegPivot;
+        leftUpperLeg.position.y = -0.225;
+        leftUpperLeg.material = pantsMat;
 
-        const rightLegPivot = new BABYLON.TransformNode("rightLegPivot", this.scene);
-        rightLegPivot.parent = this.player;
-        rightLegPivot.position.set(0.22, 0.8, 0);
-        this.player.limbs.rightLeg = rightLegPivot;
+        const leftKneePivot = new BABYLON.TransformNode("leftKneePivot", this.scene);
+        leftKneePivot.parent = leftUpperLeg;
+        leftKneePivot.position.y = -0.225;
+        this.player.limbs.leftLowerLeg = leftKneePivot;
 
-        const rightLeg = BABYLON.MeshBuilder.CreateBox("rightLeg", { width: 0.35, height: 0.8, depth: 0.35 }, this.scene);
-        rightLeg.parent = rightLegPivot;
-        rightLeg.position.y = -0.4;
-        rightLeg.material = pantsMat;
+        const leftLowerLeg = BABYLON.MeshBuilder.CreateBox("leftLowerLeg", { width: 0.35, height: 0.45, depth: 0.35 }, this.scene);
+        leftLowerLeg.parent = leftKneePivot;
+        leftLowerLeg.position.y = -0.225;
+        leftLowerLeg.material = pantsMat;
+
+        // Right Leg
+        const rightUpperLegPivot = new BABYLON.TransformNode("rightUpperLegPivot", this.scene);
+        rightUpperLegPivot.parent = this.player;
+        rightUpperLegPivot.position.set(0.22, 0.8, 0);
+        this.player.limbs.rightUpperLeg = rightUpperLegPivot;
+
+        const rightUpperLeg = BABYLON.MeshBuilder.CreateBox("rightUpperLeg", { width: 0.35, height: 0.45, depth: 0.35 }, this.scene);
+        rightUpperLeg.parent = rightUpperLegPivot;
+        rightUpperLeg.position.y = -0.225;
+        rightUpperLeg.material = pantsMat;
+
+        const rightKneePivot = new BABYLON.TransformNode("rightKneePivot", this.scene);
+        rightKneePivot.parent = rightUpperLeg;
+        rightKneePivot.position.y = -0.225;
+        this.player.limbs.rightLowerLeg = rightKneePivot;
+
+        const rightLowerLeg = BABYLON.MeshBuilder.CreateBox("rightLowerLeg", { width: 0.35, height: 0.45, depth: 0.35 }, this.scene);
+        rightLowerLeg.parent = rightKneePivot;
+        rightLowerLeg.position.y = -0.225;
+        rightLowerLeg.material = pantsMat;
 
         // Skateboard (hidden by default)
         this.createSkateboard();
         // Scooter (hidden by default)
         this.createScooter();
+        // Bicycle (hidden by default)
+        this.createBicycle();
 
         // Name tag
         const dynamicTexture = new BABYLON.DynamicTexture("nameTag", { width: 512, height: 256 }, this.scene);
@@ -879,24 +923,36 @@ window.tsFamilyEngine = {
                     if (ghost.scooter) {
                         ghost.scooter.setEnabled(ghost.targetTransportMode === "scooter");
                     }
+                    if (ghost.bicycle) {
+                        ghost.bicycle.setEnabled(ghost.targetTransportMode === "bike");
+                    }
 
                     // Simple Ghost Animation
                     if (wasMoving) {
                         const isSkating = ghost.targetTransportMode === "skate";
                         const isScooting = ghost.targetTransportMode === "scooter";
+                        const isCycling = ghost.targetTransportMode === "bike";
                         const swing = Math.sin(now * 0.008) * 0.25;
                         ghost.getChildMeshes().forEach(m => {
-                            if (m.name === "leftLegGhost") {
-                                m.rotation.x = (isSkating || isScooting) ? 0.2 : swing;
+                            if (m.name === "leftUpperLegGhost") {
+                                m.rotation.x = (isSkating || isScooting) ? 0.2 : (isCycling ? -1.0 + Math.sin(now * 0.005) : swing);
+                                if (isCycling) m.parent.position.y = 0.5; // Lower hips for bike
                             }
-                            if (m.name === "rightLegGhost") {
-                                m.rotation.x = (isSkating || isScooting) ? -swing * 2 : -swing;
+                            if (m.name === "leftLowerLegGhost") {
+                                m.rotation.x = (isSkating || isScooting) ? 0.1 : (isCycling ? 1.5 : (swing < 0 ? -swing : 0));
+                            }
+                            if (m.name === "rightUpperLegGhost") {
+                                m.rotation.x = (isSkating || isScooting) ? -swing * 2 : (isCycling ? -1.0 - Math.sin(now * 0.005) : -swing);
+                                if (!isCycling) m.parent.position.y = 0.575; // Reset hips
+                            }
+                            if (m.name === "rightLowerLegGhost") {
+                                m.rotation.x = (isSkating || isScooting) ? (swing > 0 ? swing : 0) : (isCycling ? 1.5 : (swing > 0 ? swing : 0));
                             }
                             if (m.name === "leftArmGhost") {
-                                m.rotation.x = isScooting ? -1.3 : (isSkating ? -0.4 : -swing);
+                                m.rotation.x = isCycling ? -1.2 : (isScooting ? -1.3 : (isSkating ? -0.4 : -swing));
                             }
                             if (m.name === "rightArmGhost") {
-                                m.rotation.x = isScooting ? -1.3 : (isSkating ? 0.4 : swing);
+                                m.rotation.x = isCycling ? -1.2 : (isScooting ? -1.3 : (isSkating ? 0.4 : swing));
                             }
                         });
                     }
@@ -932,15 +988,25 @@ window.tsFamilyEngine = {
         const pantsMat = new BABYLON.StandardMaterial("pantsMatGhost", this.scene);
         pantsMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1);
 
-        const leftLeg = BABYLON.MeshBuilder.CreateBox("leftLegGhost", { width: 0.35, height: 0.8, depth: 0.35 }, this.scene);
-        leftLeg.parent = ghost;
-        leftLeg.position = new BABYLON.Vector3(-0.2, 0.4, 0);
-        leftLeg.material = pantsMat;
+        const leftUpperLeg = BABYLON.MeshBuilder.CreateBox("leftUpperLegGhost", { width: 0.35, height: 0.45, depth: 0.35 }, this.scene);
+        leftUpperLeg.parent = ghost;
+        leftUpperLeg.position = new BABYLON.Vector3(-0.2, 0.575, 0); // 0.8 / 2 + offset
+        leftUpperLeg.material = pantsMat;
 
-        const rightLeg = BABYLON.MeshBuilder.CreateBox("rightLegGhost", { width: 0.35, height: 0.8, depth: 0.35 }, this.scene);
-        rightLeg.parent = ghost;
-        rightLeg.position = new BABYLON.Vector3(0.2, 0.4, 0);
-        rightLeg.material = pantsMat;
+        const leftLowerLeg = BABYLON.MeshBuilder.CreateBox("leftLowerLegGhost", { width: 0.35, height: 0.45, depth: 0.35 }, this.scene);
+        leftLowerLeg.parent = leftUpperLeg;
+        leftLowerLeg.position = new BABYLON.Vector3(0, -0.45, 0);
+        leftLowerLeg.material = pantsMat;
+
+        const rightUpperLeg = BABYLON.MeshBuilder.CreateBox("rightUpperLegGhost", { width: 0.35, height: 0.45, depth: 0.35 }, this.scene);
+        rightUpperLeg.parent = ghost;
+        rightUpperLeg.position = new BABYLON.Vector3(0.2, 0.575, 0);
+        rightUpperLeg.material = pantsMat;
+
+        const rightLowerLeg = BABYLON.MeshBuilder.CreateBox("rightLowerLegGhost", { width: 0.35, height: 0.45, depth: 0.35 }, this.scene);
+        rightLowerLeg.parent = rightUpperLeg;
+        rightLowerLeg.position = new BABYLON.Vector3(0, -0.45, 0);
+        rightLowerLeg.material = pantsMat;
 
         // Arms
         const leftArm = BABYLON.MeshBuilder.CreateBox("leftArmGhost", { width: 0.3, height: 0.7, depth: 0.3 }, this.scene);
@@ -968,9 +1034,10 @@ window.tsFamilyEngine = {
         nameMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1);
         namePlane.material = nameMaterial;
 
-        // Ghost Skateboard & Scooter
+        // Ghost Skateboard, Scooter, & Bicycle
         ghost.skateboard = this.createSkateboard(ghost);
         ghost.scooter = this.createScooter(ghost);
+        ghost.bicycle = this.createBicycle(ghost);
 
         this.ghostPlayers[id] = ghost;
     },
@@ -1130,10 +1197,82 @@ window.tsFamilyEngine = {
         return scooterRoot;
     },
 
+    createBicycle: function (parent = null) {
+        const root = parent || this.player;
+        const bikeRoot = new BABYLON.TransformNode("bicycleRoot", this.scene);
+        bikeRoot.parent = root;
+        bikeRoot.position.y = 0;
+        bikeRoot.setEnabled(false);
+
+        const frameMat = new BABYLON.StandardMaterial("bikeFrameMat", this.scene);
+        frameMat.diffuseColor = new BABYLON.Color3(0.8, 0.2, 0.2); // Red bike
+
+        const tireMat = new BABYLON.StandardMaterial("tireMat", this.scene);
+        tireMat.diffuseColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+
+        const metalMat = new BABYLON.StandardMaterial("bikeMetalMat", this.scene);
+        metalMat.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.7);
+
+        // Frame
+        const bar1 = BABYLON.MeshBuilder.CreateBox("bikeBar1", { width: 0.05, height: 1.0, depth: 0.05 }, this.scene);
+        bar1.parent = bikeRoot;
+        bar1.position.set(0, 0.5, 0.1);
+        bar1.rotation.x = -0.5;
+        bar1.material = frameMat;
+
+        const bar2 = BABYLON.MeshBuilder.CreateBox("bikeBar2", { width: 0.05, height: 0.8, depth: 0.05 }, this.scene);
+        bar2.parent = bikeRoot;
+        bar2.position.set(0, 0.6, 0.5);
+        bar2.rotation.x = 0.5;
+        bar2.material = frameMat;
+
+        const topBar = BABYLON.MeshBuilder.CreateBox("bikeTopBar", { width: 0.05, height: 0.8, depth: 0.05 }, this.scene);
+        topBar.parent = bikeRoot;
+        topBar.position.set(0, 0.8, 0.25);
+        topBar.rotation.x = Math.PI / 2;
+        topBar.material = frameMat;
+
+        // Seat
+        const seat = BABYLON.MeshBuilder.CreateBox("bikeSeat", { width: 0.25, height: 0.05, depth: 0.4 }, this.scene);
+        seat.parent = bikeRoot;
+        seat.position.set(0, 0.9, -0.1);
+        seat.material = tireMat;
+
+        // Handlebars
+        const stem = BABYLON.MeshBuilder.CreateBox("bikeStem", { width: 0.05, height: 0.4, depth: 0.05 }, this.scene);
+        stem.parent = bikeRoot;
+        stem.position.set(0, 1.0, 0.65);
+        stem.material = metalMat;
+
+        const bars = BABYLON.MeshBuilder.CreateBox("bikeBars", { width: 0.8, height: 0.05, depth: 0.05 }, this.scene);
+        bars.parent = stem;
+        bars.position.y = 0.2;
+        bars.material = metalMat;
+
+        // Wheels
+        const wheelF = BABYLON.MeshBuilder.CreateCylinder("wheelF", { diameter: 0.8, height: 0.1 }, this.scene);
+        wheelF.parent = bikeRoot;
+        wheelF.position.set(0, 0.4, 0.8);
+        wheelF.rotation.z = Math.PI / 2;
+        wheelF.material = tireMat;
+
+        const wheelR = BABYLON.MeshBuilder.CreateCylinder("wheelR", { diameter: 0.8, height: 0.1 }, this.scene);
+        wheelR.parent = bikeRoot;
+        wheelR.position.set(0, 0.4, -0.4);
+        wheelR.rotation.z = Math.PI / 2;
+        wheelR.material = tireMat;
+
+        if (!parent) {
+            this.player.bicycle = bikeRoot;
+        }
+        return bikeRoot;
+    },
+
     setTransportVisibility: function (mode) {
         if (this.player) {
             if (this.player.skateboard) this.player.skateboard.setEnabled(mode === "skate");
             if (this.player.scooter) this.player.scooter.setEnabled(mode === "scooter");
+            if (this.player.bicycle) this.player.bicycle.setEnabled(mode === "bike");
         }
     },
 

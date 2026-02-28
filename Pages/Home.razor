@@ -49,6 +49,7 @@
                         <div class="asset-item @(TransportMode == "walk" ? "selected" : "")" @onclick="@(() => SetTransport("walk"))">🚶 Walking</div>
                         <div class="asset-item @(TransportMode == "skate" ? "selected" : "")" @onclick="@(() => SetTransport("skate"))">🛹 Skateboard</div>
                         <div class="asset-item @(TransportMode == "scooter" ? "selected" : "")" @onclick="@(() => SetTransport("scooter"))">🛴 Scooter</div>
+                        <div class="asset-item @(TransportMode == "bike" ? "selected" : "")" @onclick="@(() => SetTransport("bike"))">🚲 Bicycle</div>
                     </div>
                 </div>
             }
