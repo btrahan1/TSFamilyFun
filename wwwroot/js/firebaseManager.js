@@ -27,17 +27,18 @@ window.firebaseManager = {
             x: position.x,
             y: position.y,
             z: position.z,
-            ry: rotation.y,
-            transportMode: transportMode,
+            ry: rotation,
+            transport: transportMode,
             lastSeen: serverTimestamp()
         }, { merge: true });
     },
 
-    updatePlayerRC: async function (userId, position, rotation, mode) {
+    updatePlayerRC: async function (userId, position, rotation, mode, name) {
         if (!userId) return;
         const playerDoc = doc(this.playersRef, userId);
         if (position) {
             await setDoc(playerDoc, {
+                name: name,
                 rcX: position.x,
                 rcY: position.y,
                 rcZ: position.z,
@@ -52,7 +53,8 @@ window.firebaseManager = {
                 rcX: null,
                 rcY: null,
                 rcZ: null,
-                rcRy: null
+                rcRy: null,
+                lastSeen: serverTimestamp()
             }, { merge: true });
         }
     },
@@ -70,7 +72,7 @@ window.firebaseManager = {
     },
 
     // Chat functionality
-    sendChatMessage: async function (userId, name, text) {
+    sendChat: async function (userId, name, text) {
         const chatRef = collection(this.db, "chat");
         const msgDoc = doc(chatRef);
         await setDoc(msgDoc, {
@@ -94,7 +96,7 @@ window.firebaseManager = {
     },
 
     // World Objects
-    placeWorldObject: async function (objectData) {
+    addWorldObject: async function (objectData) {
         try {
             const id = Math.random().toString(36).substr(2, 9);
             await setDoc(doc(this.db, "world_objects", id), {
@@ -117,7 +119,7 @@ window.firebaseManager = {
         });
     },
 
-    deleteWorldObject: async function (id) {
+    removeWorldObject: async function (id) {
         try {
             const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js");
             await deleteDoc(doc(this.db, "world_objects", id));
